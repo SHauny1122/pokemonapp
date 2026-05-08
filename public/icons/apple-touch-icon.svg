@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180" fill="none">
+  <rect width="180" height="180" rx="40" fill="#0B0C0F"/>
+  <rect x="14" y="14" width="152" height="152" rx="32" fill="url(#card)"/>
+  <circle cx="138" cy="48" r="18" fill="url(#goldGlow)" fill-opacity="0.35"/>
+  <path d="M54 116L72 70H88L70 116H54Z" fill="#F5D78F"/>
+  <path d="M87 116L105 70H122L104 116H87Z" fill="#E1B54F"/>
+  <rect x="52" y="122" width="76" height="8" rx="4" fill="#2B2F39"/>
+  <defs>
+    <linearGradient id="card" x1="90" y1="14" x2="90" y2="166" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#171A22"/>
+      <stop offset="1" stop-color="#0F1117"/>
+    </linearGradient>
+    <radialGradient id="goldGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(138 48) rotate(90) scale(18)">
+      <stop stop-color="#E1B54F"/>
+      <stop offset="1" stop-color="#E1B54F" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+</svg>
