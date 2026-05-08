@@ -1,5 +1,30 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Supabase Foundation (Phase 1)
+
+The app includes a safe initial account/subscription foundation with optional Supabase auth.
+
+Required environment variables:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+If these are not set, the app still runs using existing local/mock behavior.
+
+### SQL Setup
+
+Run this migration in Supabase SQL editor:
+
+- `supabase/migrations/20260508_account_foundation.sql`
+
+This creates `profiles`, `user_settings`, and `saved_deal_checks` with RLS + auth trigger.
+
+### Data Provider Architecture Note
+
+See:
+
+- `docs/data-provider-roadmap.md`
+
 ## Getting Started
 
 First, run the development server:

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
+import { useAuth } from "@/components/auth-provider";
 import { useCollection } from "@/components/collection-provider";
 import { useCurrency } from "@/components/currency-provider";
 import { CurrencySelector } from "@/components/currency-selector";
@@ -10,6 +11,7 @@ import { MobileShell } from "@/components/mobile-shell";
 export default function ProfilePage() {
   const { cards, totalCards, totalValue, isHydrated } = useCollection();
   const { formatUsd, selectedCurrency } = useCurrency();
+  const { user, profile, signOut, isLoading, isSupabaseConfigured } = useAuth();
 
   const mostValuablePosition = useMemo(() => {
     return cards.reduce<{
@@ -48,15 +50,29 @@ export default function ProfilePage() {
               </div>
               <div>
                 <p className="text-sm font-semibold text-white">Collector Profile</p>
-                <p className="text-xs text-zinc-400">Email not connected yet</p>
+                <p className="text-xs text-zinc-400">
+                  {isLoading ? "Checking account..." : user?.email ?? "Email not connected yet"}
+                </p>
               </div>
             </div>
-            <button
-              type="button"
-              className="rounded-lg border border-[#35363d] bg-[#1b1c22] px-2.5 py-1.5 text-[11px] font-medium text-zinc-200"
-            >
-              Edit Profile
-            </button>
+            {user ? (
+              <button
+                type="button"
+                onClick={() => {
+                  void signOut();
+                }}
+                className="rounded-lg border border-[#35363d] bg-[#1b1c22] px-2.5 py-1.5 text-[11px] font-medium text-zinc-200"
+              >
+                Log Out
+              </button>
+            ) : (
+              <Link
+                href="/login"
+                className="rounded-lg border border-[#35363d] bg-[#1b1c22] px-2.5 py-1.5 text-[11px] font-medium text-zinc-200"
+              >
+                Log In
+              </Link>
+            )}
           </div>
 
           <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-[#32343c] bg-[#101217] px-2.5 py-1 text-xs text-zinc-300">
@@ -65,6 +81,47 @@ export default function ProfilePage() {
             <span className="text-zinc-500">•</span>
             <span className="font-semibold">{selectedCurrency.code}</span>
           </div>
+
+          {!isSupabaseConfigured ? (
+            <p className="mt-2 text-xs text-amber-200">
+              Add Supabase env vars to enable account sync across devices.
+            </p>
+          ) : null}
+        </article>
+
+        <article className="rounded-2xl border border-[#2a2b2f] bg-[#15171b] p-4">
+          <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">Subscription</p>
+          {user ? (
+            <>
+              <div className="mt-2 rounded-xl border border-[#30323a] bg-[#11131a] p-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">Current plan</span>
+                  <span className="font-semibold text-white">{profile?.plan ?? "Free"}</span>
+                </div>
+                <div className="mt-1 flex items-center justify-between">
+                  <span className="text-zinc-400">Status</span>
+                  <span className="font-semibold text-white">{profile?.subscription_status ?? "Inactive"}</span>
+                </div>
+                <div className="mt-1 flex items-center justify-between">
+                  <span className="text-zinc-400">Billing period</span>
+                  <span className="font-semibold text-white">{profile?.subscription_period ?? "Not set"}</span>
+                </div>
+              </div>
+              <Link
+                href="/subscription"
+                className="mt-3 inline-flex w-full items-center justify-center rounded-xl bg-[#e1b54f] px-4 py-3 text-sm font-semibold text-[#141519]"
+              >
+                Upgrade
+              </Link>
+            </>
+          ) : (
+            <div className="mt-2 rounded-xl border border-dashed border-[#3a3b42] bg-[#11131a] p-3 text-sm text-zinc-300">
+              <p>Create an account to sync your collection and manage subscription.</p>
+              <Link href="/login" className="mt-2 inline-flex text-sm text-[#e1b54f]">
+                Create account / Log in
+              </Link>
+            </div>
+          )}
         </article>
 
         <article className="rounded-2xl border border-[#2a2b2f] bg-[#15171b] p-4">
