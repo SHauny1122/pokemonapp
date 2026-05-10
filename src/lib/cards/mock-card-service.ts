@@ -1,5 +1,4 @@
 import { mockCards, mockSets } from "@/lib/mock-data";
-import { evaluateDealCheck } from "@/lib/cards/deal-check-engine";
 import {
   Card,
   CardService,
@@ -8,7 +7,10 @@ import {
 } from "@/lib/cards/types";
 
 function toCard(card: (typeof mockCards)[number]): Card {
-  return { ...card };
+  return {
+    ...card,
+    dataSource: "mock",
+  };
 }
 
 function toSet(set: (typeof mockSets)[number]): CardSet {
@@ -76,12 +78,6 @@ export const mockCardService: CardService = {
   },
 
   getDealCheck(cardId, askingPrice) {
-    const card = mockCards.find((entry) => entry.id === cardId);
-
-    if (!card || !Number.isFinite(askingPrice) || askingPrice <= 0) {
-      return undefined;
-    }
-
-    return evaluateDealCheck(toCard(card), askingPrice);
+    return undefined;
   },
 };

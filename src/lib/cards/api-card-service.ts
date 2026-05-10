@@ -158,6 +158,6 @@ export const apiCardService: CardService = {
       return evaluateDealCheck(cached, askingPrice);
     }
 
-    return mockCardService.getDealCheck(cardId, askingPrice);
+    return undefined;
   },
 };

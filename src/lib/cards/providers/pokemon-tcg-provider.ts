@@ -27,6 +27,7 @@ export type PokemonTcgCardRecord = {
   id: string;
   name: string;
   number: string;
+  updatedAt?: string;
   rarity?: string;
   supertype?: string;
   types?: string[];

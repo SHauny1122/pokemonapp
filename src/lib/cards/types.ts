@@ -37,6 +37,7 @@ export type Card = {
   pricing?: CardPricing;
   tcgplayerPrices?: Record<string, CardPriceBreakdown>;
   cardmarketPrices?: CardPriceBreakdown;
+  priceUpdatedAt?: string;
   dataSource?: "mock" | "pokemon-tcg-api";
   flipScore: number;
   trend: PriceTrend;
@@ -63,15 +64,12 @@ export type PriceSummary = {
 
 export type DealVerdict = "GOOD BUY" | "FAIR PRICE" | "OVERPRICED";
 
-export type DealCheckSignal = {
-  key: string;
-  label: string;
-  valueText: string;
-  weight: number;
-  score: number;
-  impact: "positive" | "neutral" | "negative";
-  note: string;
-};
+export type DealDataQuality = "live-data" | "limited-data" | "demo-fallback" | "price-unavailable";
+
+export type DealPriceSource =
+  | "tcgplayer-pokemon-tcg-api"
+  | "cardmarket-pokemon-tcg-api"
+  | "mock-fallback";
 
 export type DealCheckResult = {
   card: Card;
@@ -80,21 +78,13 @@ export type DealCheckResult = {
   differencePercent: number;
   verdict: DealVerdict;
   explanation: string;
-  flipScoreNote: string;
   confidence: number;
-  score: number;
-  averageSoldPrice: number;
-  medianSoldPrice: number;
-  recentSoldPrices: number[];
-  trend30d: PriceTrend;
-  trend30dPercent: number;
-  volatilityPercent: number;
-  liquidityScore: number;
-  demandScore: number;
-  savingsAmount: number;
-  activityLabel: string;
-  insights: string[];
-  signalBreakdown: DealCheckSignal[];
+  confidenceNote: string;
+  dataQuality: DealDataQuality;
+  priceSources: DealPriceSource[];
+  lastUpdated?: string;
+  missingDataWarnings: string[];
+  unavailableMetrics: string[];
 };
 
 export type CardService = {

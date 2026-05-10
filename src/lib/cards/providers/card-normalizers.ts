@@ -169,6 +169,7 @@ export function normalizePokemonCard(rawCard: PokemonTcgCardRecord): Card {
     pricing,
     tcgplayerPrices: Object.keys(tcgplayerVariants).length > 0 ? tcgplayerVariants : undefined,
     cardmarketPrices: cardmarket,
+    priceUpdatedAt: rawCard.updatedAt,
     flipScore: computeFlipScore(rawCard.rarity, marketValue, tcgplayerVariants, cardmarket),
     trend: deriveTrend(cardmarket),
     history: [],

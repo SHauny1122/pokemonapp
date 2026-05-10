@@ -7,7 +7,7 @@ import { CardCollectionActions } from "@/components/card-collection-actions";
 import { useCurrency } from "@/components/currency-provider";
 import { MobileShell } from "@/components/mobile-shell";
 import { getCardById, getDealCheck, searchCards } from "@/lib/cards/card-service";
-import { Card, DealCheckResult, DealVerdict } from "@/lib/cards/types";
+import { Card, DealDataQuality, DealPriceSource, DealVerdict } from "@/lib/cards/types";
 
 function getVerdictTone(verdict: DealVerdict) {
   switch (verdict) {
@@ -29,28 +29,88 @@ function getVerdictTone(verdict: DealVerdict) {
   }
 }
 
-function getTrendTone(result: DealCheckResult) {
-  if (result.trend30d === "up") {
-    return "text-emerald-300";
+function getPriceSourceLabel(source: DealPriceSource) {
+  switch (source) {
+    case "tcgplayer-pokemon-tcg-api":
+      return "TCGplayer via Pokemon TCG API";
+    case "cardmarket-pokemon-tcg-api":
+      return "Cardmarket via Pokemon TCG API";
+    default:
+      return "Mock fallback/demo";
   }
-
-  if (result.trend30d === "down") {
-    return "text-rose-300";
-  }
-
-  return "text-zinc-200";
 }
 
-function getCardTrendTone(trend: Card["trend"]) {
-  if (trend === "up") {
-    return "text-emerald-300";
+function getDataQualityLabel(dataQuality: DealDataQuality) {
+  switch (dataQuality) {
+    case "live-data":
+      return "Live data";
+    case "limited-data":
+      return "Limited data";
+    case "demo-fallback":
+      return "Demo fallback";
+    default:
+      return "Price unavailable";
+  }
+}
+
+function getDataQualityTone(dataQuality: DealDataQuality) {
+  switch (dataQuality) {
+    case "live-data":
+      return "border-emerald-500/40 bg-emerald-500/10 text-emerald-200";
+    case "limited-data":
+      return "border-amber-500/40 bg-amber-500/10 text-amber-200";
+    case "demo-fallback":
+      return "border-zinc-500/40 bg-zinc-500/10 text-zinc-200";
+    default:
+      return "border-rose-500/40 bg-rose-500/10 text-rose-200";
+  }
+}
+
+function getSelectedCardDataQuality(card: Card | null): DealDataQuality {
+  if (!card) {
+    return "price-unavailable";
   }
 
-  if (trend === "down") {
-    return "text-rose-300";
+  if (card.dataSource !== "pokemon-tcg-api") {
+    return "demo-fallback";
   }
 
-  return "text-zinc-300";
+  if (card.marketValue === null || card.marketValue <= 0) {
+    return "price-unavailable";
+  }
+
+  const hasTcgplayer = Boolean(card.tcgplayerPrices && Object.keys(card.tcgplayerPrices).length > 0);
+  const hasCardmarket = Boolean(
+    card.cardmarketPrices &&
+      (card.cardmarketPrices.market !== undefined ||
+        card.cardmarketPrices.mid !== undefined ||
+        card.cardmarketPrices.low !== undefined)
+  );
+
+  return hasTcgplayer && hasCardmarket ? "live-data" : "limited-data";
+}
+
+function getSelectedCardPriceSources(card: Card | null): DealPriceSource[] {
+  if (!card || card.dataSource !== "pokemon-tcg-api") {
+    return card ? ["mock-fallback"] : [];
+  }
+
+  const sources: DealPriceSource[] = [];
+
+  if (card.tcgplayerPrices && Object.keys(card.tcgplayerPrices).length > 0) {
+    sources.push("tcgplayer-pokemon-tcg-api");
+  }
+
+  if (
+    card.cardmarketPrices &&
+    (card.cardmarketPrices.market !== undefined ||
+      card.cardmarketPrices.mid !== undefined ||
+      card.cardmarketPrices.low !== undefined)
+  ) {
+    sources.push("cardmarket-pokemon-tcg-api");
+  }
+
+  return sources;
 }
 
 function DealResultSkeleton() {
@@ -160,47 +220,14 @@ function DealCheckContent() {
     });
   }, [allCards, query]);
 
-  const featuredCards = useMemo(() => {
-    return [...allCards]
-      .filter((card) => card.marketValue !== null)
-      .sort((a, b) => {
-        if (b.flipScore !== a.flipScore) {
-          return b.flipScore - a.flipScore;
-        }
-
-        return (b.marketValue ?? 0) - (a.marketValue ?? 0);
-      })
-      .slice(0, 3);
-  }, [allCards]);
-
-  const hotSets = useMemo(() => {
-    const setCountMap = new Map<string, number>();
-
-    allCards.forEach((card) => {
-      setCountMap.set(card.set, (setCountMap.get(card.set) ?? 0) + 1);
-    });
-
-    return [...setCountMap.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([name, count]) => ({ name, count }));
-  }, [allCards]);
-
-  const marketPulse = useMemo(() => {
-    const up = allCards.filter((card) => card.trend === "up").length;
-    const down = allCards.filter((card) => card.trend === "down").length;
-    const avgFlip =
-      allCards.length > 0
-        ? Math.round(allCards.reduce((sum, card) => sum + card.flipScore, 0) / allCards.length)
-        : 0;
-
-    return { up, down, avgFlip };
-  }, [allCards]);
-
   const askingPriceNumber = Number(askingPrice);
   const hasValidAskingPrice = Number.isFinite(askingPriceNumber) && askingPriceNumber > 0;
   const askingPriceUsd = hasValidAskingPrice ? convertToUsd(askingPriceNumber) : 0;
-  const canAnalyze = Boolean(selectedCard && hasValidAskingPrice);
+  const selectedCardDataQuality = getSelectedCardDataQuality(selectedCard);
+  const selectedCardPriceSources = getSelectedCardPriceSources(selectedCard);
+  const isLiveCard = selectedCard?.dataSource === "pokemon-tcg-api";
+  const hasLiveMarketPrice = Boolean(selectedCard && selectedCard.marketValue !== null && selectedCard.marketValue > 0);
+  const canAnalyze = Boolean(selectedCard && hasValidAskingPrice && isLiveCard && hasLiveMarketPrice);
 
   const dealCheck = selectedCard && hasValidAskingPrice ? getDealCheck(selectedCard.id, askingPriceUsd) : undefined;
 
@@ -284,22 +311,11 @@ function DealCheckContent() {
           <p className="text-xs uppercase tracking-[0.18em] text-[#e1b54f]">Collector Intelligence</p>
           <h2 className="mt-2 text-xl font-semibold text-white">Know before you buy.</h2>
           <p className="mt-1 text-sm text-zinc-300">
-            Compare asking price against recent sold activity, trend direction, volatility, and liquidity signals.
+            Strict trust mode only compares your asking price against live market pricing when real source data exists.
           </p>
 
-          <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-            <div className="rounded-xl border border-[#383a43] bg-black/20 px-2.5 py-2">
-              <p className="text-zinc-400">Market Up</p>
-              <p className="mt-1 text-base font-semibold text-emerald-300">{marketPulse.up}</p>
-            </div>
-            <div className="rounded-xl border border-[#383a43] bg-black/20 px-2.5 py-2">
-              <p className="text-zinc-400">Market Down</p>
-              <p className="mt-1 text-base font-semibold text-rose-300">{marketPulse.down}</p>
-            </div>
-            <div className="rounded-xl border border-[#383a43] bg-black/20 px-2.5 py-2">
-              <p className="text-zinc-400">Avg Flip</p>
-              <p className="mt-1 text-base font-semibold text-white">{marketPulse.avgFlip}</p>
-            </div>
+          <div className="mt-3 rounded-xl border border-[#383a43] bg-black/20 px-3 py-3 text-xs text-zinc-300">
+            <p>Not enough data for recent sold prices, trend, volatility, liquidity, demand, market pulse, or charts.</p>
           </div>
         </article>
 
@@ -334,16 +350,11 @@ function DealCheckContent() {
                   <p className="truncate text-xs text-zinc-400">
                     {selectedCard.set} • {selectedCard.number} • {selectedCard.rarity}
                   </p>
-                  <div className="mt-1 flex items-center gap-2 text-[11px]">
-                    <span className={getCardTrendTone(selectedCard.trend)}>{selectedCard.trend.toUpperCase()} TREND</span>
-                    <span className="text-zinc-500">•</span>
-                    <span className="text-zinc-300">Flip {selectedCard.flipScore}</span>
-                    {selectedCard.marketValue !== null ? (
-                      <>
-                        <span className="text-zinc-500">•</span>
-                        <span className="text-zinc-300">{formatUsd(selectedCard.marketValue)} market</span>
-                      </>
-                    ) : null}
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px]">
+                    <span className={`rounded-full border px-2 py-0.5 ${getDataQualityTone(selectedCardDataQuality)}`}>
+                      {getDataQualityLabel(selectedCardDataQuality)}
+                    </span>
+                    {selectedCard.marketValue !== null ? <span className="text-zinc-300">{formatUsd(selectedCard.marketValue)} market</span> : null}
                   </div>
                 </div>
               </div>
@@ -428,66 +439,26 @@ function DealCheckContent() {
           >
             Analyze Deal
           </button>
+
+          {!canAnalyze && selectedCard ? (
+            <div className="mt-3 rounded-xl border border-dashed border-[#4a3e2a] bg-[#1a1610] px-3 py-3 text-xs text-amber-200">
+              {selectedCard.dataSource !== "pokemon-tcg-api"
+                ? "Demo fallback card selected. Real analysis is disabled until live card data is available."
+                : selectedCard.marketValue === null || selectedCard.marketValue <= 0
+                  ? "This card does not have enough live price data yet. Price unavailable."
+                  : "Enter a valid asking price to analyze with live market data."}
+            </div>
+          ) : null}
         </article>
 
         {!showAnalysis ? (
-          <div className="space-y-3">
-            <article className="rounded-2xl border border-[#2a2b2f] bg-[#15171b] p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-white">Trending Cards</p>
-                <p className="text-xs text-zinc-500">Loaded market catalog</p>
-              </div>
-
-              {featuredCards.length > 0 ? (
-                <div className="mt-3 grid grid-cols-3 gap-2">
-                  {featuredCards.map((card) => (
-                    <button
-                      key={`featured-${card.id}`}
-                      type="button"
-                      onClick={() => setSelectedCardId(card.id)}
-                      className="rounded-xl border border-[#2f3238] bg-[#101319] p-2 text-left"
-                    >
-                      <p className="line-clamp-2 text-xs font-semibold text-white">{card.name}</p>
-                      <p className="mt-1 text-[11px] text-zinc-500">Flip {card.flipScore}</p>
-                      <p className="text-[11px] text-zinc-300">
-                        {card.marketValue !== null ? formatUsd(card.marketValue) : "No price"}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="mt-3 rounded-xl border border-dashed border-[#373941] bg-[#11131a] px-3 py-3 text-xs text-zinc-400">
-                  Trending cards will appear after card data loads.
-                </div>
-              )}
-            </article>
-
-            <article className="rounded-2xl border border-[#2a2b2f] bg-[#15171b] p-4">
-              <p className="text-sm font-medium text-white">Market Pulse</p>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <div className="rounded-xl border border-[#2f3238] bg-[#11131a] p-3 text-sm">
-                  <p className="text-zinc-400">Hot Sets</p>
-                  <div className="mt-1 space-y-1 text-xs text-zinc-200">
-                    {hotSets.length > 0 ? (
-                      hotSets.map((setItem) => (
-                        <p key={setItem.name}>
-                          {setItem.name} <span className="text-zinc-500">({setItem.count})</span>
-                        </p>
-                      ))
-                    ) : (
-                      <p className="text-zinc-400">Set data loading...</p>
-                    )}
-                  </div>
-                </div>
-                <div className="rounded-xl border border-[#2f3238] bg-[#11131a] p-3 text-sm">
-                  <p className="text-zinc-400">Deal Tip</p>
-                  <p className="mt-1 text-xs text-zinc-200">
-                    Strong buys usually show favorable pricing vs median sold with steady liquidity, not just high hype.
-                  </p>
-                </div>
-              </div>
-            </article>
-          </div>
+          <article className="rounded-2xl border border-[#2a2b2f] bg-[#15171b] p-4 text-sm text-zinc-300">
+            <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">Trust Mode</p>
+            <p className="mt-2">Deal Check only runs verdict analysis for live cards with usable market prices.</p>
+            <p className="mt-2 text-zinc-400">
+              If a card is fallback/demo or missing live price fields, analysis is limited and unavailable metrics are shown clearly.
+            </p>
+          </article>
         ) : null}
 
         {isPreparingAnalysis ? <DealResultSkeleton /> : null}
@@ -535,15 +506,8 @@ function DealCheckContent() {
                 <p className="mt-1 text-lg font-semibold text-white">{formatUsd(dealCheck.askingPrice)}</p>
               </div>
               <div className="rounded-xl border border-[#30343c] bg-[#12151c] p-3">
-                <p className="text-zinc-400">Median Sold</p>
-                <p className="mt-1 text-lg font-semibold text-white">{formatUsd(dealCheck.medianSoldPrice)}</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="rounded-xl border border-[#30343c] bg-[#12151c] p-3">
-                <p className="text-zinc-400">Average Sold</p>
-                <p className="mt-1 text-base font-semibold text-zinc-100">{formatUsd(dealCheck.averageSoldPrice)}</p>
+                <p className="text-zinc-400">Live Market Price</p>
+                <p className="mt-1 text-lg font-semibold text-white">{formatUsd(dealCheck.marketPrice)}</p>
               </div>
               <div className="rounded-xl border border-[#30343c] bg-[#12151c] p-3">
                 <p className="text-zinc-400">Vs market</p>
@@ -555,105 +519,68 @@ function DealCheckContent() {
             </div>
 
             <div className="rounded-2xl border border-[#30343c] bg-[#12151c] p-4">
-              <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">You save</p>
-              <p
-                className={`mt-1 text-2xl font-semibold ${
-                  dealCheck.savingsAmount >= 0 ? "text-emerald-300" : "text-rose-300"
-                }`}
-              >
-                {dealCheck.savingsAmount >= 0 ? "-" : "+"}
-                {formatUsd(Math.abs(dealCheck.savingsAmount))}
-              </p>
-              <p className="mt-1 text-xs text-zinc-400">Compared to median recent sold price.</p>
-            </div>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-medium text-white">Data quality</p>
+                <span className={`rounded-full border px-2.5 py-1 text-xs ${getDataQualityTone(dealCheck.dataQuality)}`}>
+                  {getDataQualityLabel(dealCheck.dataQuality)}
+                </span>
+              </div>
 
-            <div className="rounded-2xl border border-[#30343c] bg-[#12151c] p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-white">Recent Sold Prices</p>
-                <p className="text-xs text-zinc-500">Latest comps</p>
-              </div>
-              <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-                {dealCheck.recentSoldPrices.map((price, index) => (
-                  <div key={`${price}-${index}`} className="rounded-lg border border-[#30343c] bg-[#0f1218] px-2 py-2 text-center text-zinc-200">
-                    {formatUsd(price)}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-[#30343c] bg-[#12151c] p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-white">Market Trend</p>
-                <p className={`text-xs font-medium ${getTrendTone(dealCheck)}`}>
-                  {dealCheck.trend30dPercent > 0 ? "+" : ""}
-                  {dealCheck.trend30dPercent.toFixed(1)}% / 30d
-                </p>
-              </div>
-              <div className="mt-3 flex items-end gap-1">
-                {dealCheck.recentSoldPrices.map((price, index, all) => {
-                  const min = Math.min(...all);
-                  const max = Math.max(...all);
-                  const height = ((price - min) / Math.max(max - min, 1)) * 48 + 14;
-
-                  return (
-                    <div key={`bar-${index}`} className="flex-1">
-                      <div
-                        className="w-full rounded-sm bg-gradient-to-t from-[#293042] to-[#6f7f9a]"
-                        style={{ height }}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-              <p className="mt-2 text-xs text-zinc-400">
-                Volatility {dealCheck.volatilityPercent.toFixed(1)}% • {dealCheck.trend30d} trend
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-xl border border-[#30343c] bg-[#12151c] p-3 text-sm">
-                <p className="text-zinc-400">Collector demand</p>
-                <p className="mt-1 text-lg font-semibold text-white">{dealCheck.demandScore}/100</p>
-              </div>
-              <div className="rounded-xl border border-[#30343c] bg-[#12151c] p-3 text-sm">
-                <p className="text-zinc-400">Market activity</p>
-                <p className="mt-1 text-lg font-semibold text-white">{dealCheck.activityLabel}</p>
-                <p className="text-xs text-zinc-500">Liquidity {dealCheck.liquidityScore}/100</p>
+              <div className="mt-3 space-y-2 text-sm text-zinc-200">
+                <div className="rounded-lg border border-[#2c3038] bg-[#0f1218] px-3 py-2">
+                  <p className="text-xs text-zinc-400">Price source</p>
+                  <ul className="mt-1 space-y-1">
+                    {dealCheck.priceSources.map((source) => (
+                      <li key={source}>{getPriceSourceLabel(source)}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="rounded-lg border border-[#2c3038] bg-[#0f1218] px-3 py-2">
+                  <p className="text-xs text-zinc-400">Last updated</p>
+                  <p className="mt-1">{dealCheck.lastUpdated ? dealCheck.lastUpdated : "Not enough data"}</p>
+                </div>
+                <div className="rounded-lg border border-[#2c3038] bg-[#0f1218] px-3 py-2">
+                  <p className="text-xs text-zinc-400">Warnings</p>
+                  <ul className="mt-1 space-y-1">
+                    {dealCheck.missingDataWarnings.map((warning) => (
+                      <li key={warning}>{warning}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="rounded-lg border border-[#2c3038] bg-[#0f1218] px-3 py-2">
+                  <p className="text-xs text-zinc-400">Unavailable metrics</p>
+                  <ul className="mt-1 space-y-1">
+                    {dealCheck.unavailableMetrics.map((metric) => (
+                      <li key={metric}>{metric}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="rounded-lg border border-dashed border-[#4a3e2a] bg-[#1a1610] px-3 py-2 text-amber-200">
+                  Trend unavailable. Connect more pricing data sources.
+                </div>
+                <div className="rounded-lg border border-dashed border-[#4a3e2a] bg-[#1a1610] px-3 py-2 text-amber-200">
+                  Not enough data for sold-price history charts.
+                </div>
+                <div className="rounded-lg border border-dashed border-[#4a3e2a] bg-[#1a1610] px-3 py-2 text-amber-200">
+                  {dealCheck.confidenceNote}
+                </div>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-[#30343c] bg-[#12151c] p-4">
-              <p className="text-sm font-medium text-white">Why this verdict</p>
-              <ul className="mt-2 space-y-2 text-sm text-zinc-200">
-                {dealCheck.insights.map((insight) => (
-                  <li key={insight} className="rounded-lg border border-[#2c3038] bg-[#0f1218] px-3 py-2">
-                    {insight}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="rounded-2xl border border-[#30343c] bg-[#12151c] p-4 text-sm">
-              <p className="text-zinc-400">Signal breakdown</p>
-              <div className="mt-2 space-y-2">
-                {dealCheck.signalBreakdown.map((signal) => (
-                  <div key={signal.key} className="rounded-lg border border-[#2c3038] bg-[#0f1218] px-3 py-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <p className="text-zinc-300">{signal.label}</p>
-                      <p className="text-zinc-400">{signal.valueText}</p>
-                    </div>
-                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[#1f2229]">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-[#6f7f9a] to-[#e1b54f]"
-                        style={{ width: `${signal.score}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
+            {selectedCardPriceSources.length > 0 ? (
+              <div className="rounded-2xl border border-[#30343c] bg-[#12151c] p-4 text-sm">
+                <p className="text-zinc-400">Selected card source coverage</p>
+                <ul className="mt-2 space-y-1 text-zinc-200">
+                  {selectedCardPriceSources.map((source) => (
+                    <li key={`selected-${source}`}>{getPriceSourceLabel(source)}</li>
+                  ))}
+                </ul>
               </div>
-            </div>
-
-            <p className="text-xs text-zinc-500">{dealCheck.flipScoreNote}</p>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-[#4a3e2a] bg-[#1a1610] p-4 text-sm text-amber-200">
+                Price unavailable. Connect more pricing data sources.
+              </div>
+            )}
 
             <CardCollectionActions cardId={selectedCard.id} />
             <Link
@@ -663,13 +590,17 @@ function DealCheckContent() {
               Open Card Detail
             </Link>
           </article>
-        ) : showAnalysis && hasValidAskingPrice && selectedCard && selectedCard.marketValue === null ? (
+        ) : showAnalysis && hasValidAskingPrice && selectedCard && selectedCard.dataSource !== "pokemon-tcg-api" ? (
           <article className="rounded-2xl border border-dashed border-[#4a3e2a] bg-[#1a1610] p-4 text-sm text-amber-200">
-            Price unavailable for this card right now. Try another listing or card.
+            Demo fallback detected. This card is not from live provider data, so analysis is disabled.
+          </article>
+        ) : showAnalysis && hasValidAskingPrice && selectedCard && (selectedCard.marketValue === null || selectedCard.marketValue <= 0) ? (
+          <article className="rounded-2xl border border-dashed border-[#4a3e2a] bg-[#1a1610] p-4 text-sm text-amber-200">
+            This card does not have enough live price data yet. Price unavailable.
           </article>
         ) : !showAnalysis ? null : (
           <article className="rounded-2xl border border-dashed border-[#3a3a3a] bg-[#141519] p-4 text-sm text-zinc-400">
-            Enter an asking price to generate a conservative buy verdict using sold-price signals.
+            Enter an asking price to run live price comparison.
           </article>
         )}
       </section>
