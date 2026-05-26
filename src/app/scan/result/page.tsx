@@ -28,7 +28,7 @@ function ScanResultContent() {
         backFallbackHref="/scan"
       >
         <section className="rounded-2xl border border-dashed border-[#3a3a3a] bg-[#141519] p-4 text-sm text-zinc-400">
-          No mock scan result is available.
+          No scan result is available.
         </section>
       </MobileShell>
     );
@@ -103,7 +103,7 @@ function ScanResultContent() {
           <p className="text-center text-xs text-zinc-400">Save first, then continue to detail or deal check.</p>
           <CardCollectionActions cardId={mockLatestScan.id} />
           <Link
-            href={`/cards/${mockLatestScan.id}`}
+            href={`/detail?type=card&id=${mockLatestScan.id}`}
             className="inline-flex items-center justify-center rounded-xl border border-[#353535] bg-[#191b1f] px-4 py-3 text-sm font-medium text-white"
           >
             Open Card Detail

@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { EmailOtpType } from "@supabase/supabase-js";
 import { MobileShell } from "@/components/mobile-shell";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
@@ -20,6 +21,17 @@ function AuthCallbackContent() {
       }
 
       const code = searchParams.get("code");
+      const tokenHash = searchParams.get("token_hash");
+      const otpType = searchParams.get("type");
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+      const accessToken = hashParams.get("access_token") ?? searchParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token") ?? searchParams.get("refresh_token");
+      const authError = searchParams.get("error_description") ?? searchParams.get("error");
+
+      if (authError) {
+        setMessage(authError);
+        return;
+      }
 
       if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession(code);
@@ -28,26 +40,48 @@ function AuthCallbackContent() {
           setMessage(error.message);
           return;
         }
-      }
-
-      const { data } = await supabase.auth.getSession();
-
-      if (!data.session) {
-        const {
-          data: { subscription },
-        } = supabase.auth.onAuthStateChange((event) => {
-          if (event === "SIGNED_IN") {
-            subscription.unsubscribe();
-            router.replace("/profile");
-          }
+      } else if (tokenHash && otpType) {
+        const { error } = await supabase.auth.verifyOtp({
+          token_hash: tokenHash,
+          type: otpType as EmailOtpType,
         });
 
-        window.setTimeout(() => {
-          subscription.unsubscribe();
-          router.replace("/profile");
-        }, 1200);
+        if (error) {
+          setMessage(error.message);
+          return;
+        }
+      } else if (accessToken && refreshToken) {
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
 
-        return;
+        if (error) {
+          setMessage(error.message);
+          return;
+        }
+      }
+
+      let resolvedSession = (await supabase.auth.getSession()).data.session;
+
+      for (let attempt = 0; attempt < 20 && !resolvedSession; attempt += 1) {
+        await new Promise((resolve) => {
+          window.setTimeout(resolve, 250);
+        });
+
+        const { data } = await supabase.auth.getSession();
+        resolvedSession = data.session;
+      }
+
+      if (!resolvedSession) {
+        const { data } = await supabase.auth.refreshSession();
+        resolvedSession = data.session ?? null;
+      }
+
+      window.dispatchEvent(new Event("collectiq:auth-session-updated"));
+
+      if (!resolvedSession) {
+        setMessage("Finishing secure sign-in...");
       }
 
       router.replace("/profile");

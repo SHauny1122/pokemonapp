@@ -3,6 +3,10 @@
 :root {
   --background: #0b0c0f;
   --foreground: #ededed;
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --safe-area-inset-right: env(safe-area-inset-right, 0px);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-inset-left: env(safe-area-inset-left, 0px);
 }
 
 @theme inline {
@@ -17,6 +21,7 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), "Segoe UI", sans-serif;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 a {

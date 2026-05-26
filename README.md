@@ -11,6 +11,16 @@ Required environment variables:
 
 If these are not set, the app still runs using existing local/mock behavior.
 
+### Investment Check Provider
+
+Investment Check can use JustTCG on the server for current pricing, variant pricing, and trend statistics.
+
+Add this to `.env.local` for local backend testing:
+
+- `JUSTTCG_API_KEY`
+
+Do not prefix this with `NEXT_PUBLIC_`; it must stay server-side only.
+
 ### SQL Setup
 
 Run this migration in Supabase SQL editor:

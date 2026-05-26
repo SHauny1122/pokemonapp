@@ -75,10 +75,10 @@ export default function ScanPage() {
   };
 
   return (
-    <MobileShell title="Scan Card" subtitle="Powerful scanner, simple flow." showBackButton backFallbackHref="/search">
+    <MobileShell title="Scan Card" subtitle="Use camera preview to identify a card." showBackButton backFallbackHref="/search">
       <section className="space-y-3">
         <article className="rounded-2xl border border-[#27272a] bg-[#15161a] p-4">
-          <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">Camera Scanner (Live Preview)</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">Camera Preview</p>
           <div className="mt-3 rounded-2xl border border-[#2f2f2f] bg-[#101114] p-3">
             <div className="relative mx-auto aspect-[3/4] w-full max-w-[280px] overflow-hidden rounded-2xl border border-dashed border-[#4a4a4a] bg-gradient-to-b from-[#1a1b20] to-[#0b0c0f]">
               {cameraState === "ready" ? (
@@ -103,7 +103,7 @@ export default function ScanPage() {
 
           <p className="mt-3 text-center text-sm text-zinc-300">Position card inside frame</p>
           <p className="mt-1 text-center text-xs text-zinc-500">
-            Camera preview is live when permission is granted. Identification is still mock-only.
+            Camera preview is live when permission is granted. Results should be verified before saving.
           </p>
 
           {cameraState === "denied" ? (
@@ -144,7 +144,7 @@ export default function ScanPage() {
           </button>
 
           {isScanning ? (
-            <p className="mt-2 text-center text-xs text-zinc-400">Finding best match from your mock card catalog...</p>
+            <p className="mt-2 text-center text-xs text-zinc-400">Finding best match from your card catalog...</p>
           ) : null}
         </article>
 

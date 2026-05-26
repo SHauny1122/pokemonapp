@@ -1,24 +1,55 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo, useState } from "react";
 import { CardCollectionActions } from "@/components/card-collection-actions";
 import { useCollection } from "@/components/collection-provider";
 import { useCurrency } from "@/components/currency-provider";
 import { MobileShell } from "@/components/mobile-shell";
+import { PortfolioChartCard } from "@/components/portfolio-chart-card";
+
+const PORTFOLIO_PREVIEW_LIMIT = 4;
 
 export default function CollectionPage() {
-  const { cards, totalCards, totalValue, isHydrated } = useCollection();
+  const { cards, totalCards, totalValue, isHydrated, isSyncing, syncError } = useCollection();
   const { formatUsd } = useCurrency();
+  const [showFullPortfolio, setShowFullPortfolio] = useState(false);
+
+  const topCollectionCards = useMemo(() => {
+    return [...cards]
+      .sort((a, b) => (b.card.marketValue ?? 0) * b.quantity - (a.card.marketValue ?? 0) * a.quantity)
+      .slice(0, PORTFOLIO_PREVIEW_LIMIT);
+  }, [cards]);
+
+  const displayedCards = showFullPortfolio ? cards : topCollectionCards;
 
   return (
     <MobileShell title="My Collection" subtitle="Track value, movement, and opportunities.">
-      <section className="space-y-4">
-        <article className="rounded-2xl border border-[#27272a] bg-[#15161a] p-5">
-          <p className="text-sm text-zinc-400">Total Value</p>
-          <p className="mt-1 text-3xl font-semibold text-white">
-            {isHydrated ? formatUsd(totalValue) : "..."}
-          </p>
-          <p className="mt-1 text-sm text-zinc-400">{isHydrated ? totalCards : 0} cards saved on this device</p>
+      <section className="space-y-5">
+        {isSyncing ? (
+          <article className="rounded-2xl border border-dashed border-[#3a3b42] bg-[#14161d] p-3 text-xs text-zinc-300">
+            Syncing your account collection...
+          </article>
+        ) : null}
+
+        {syncError ? (
+          <article className="rounded-2xl border border-dashed border-[#4a3e2a] bg-[#1a1610] p-3 text-xs text-amber-200">
+            {syncError}
+          </article>
+        ) : null}
+
+        <PortfolioChartCard
+          cards={cards}
+          totalCards={totalCards}
+          totalValue={totalValue}
+          isHydrated={isHydrated}
+          showTotalValue={false}
+        />
+
+        <article className="rounded-2xl border border-[#242b35] bg-[#0d0f13] p-5">
+          <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">Total collection value</p>
+          <p className="mt-2 text-4xl font-semibold tracking-tight text-white">{isHydrated ? formatUsd(totalValue) : "..."}</p>
+          <p className="mt-2 text-sm text-zinc-400">{isHydrated ? totalCards : 0} cards in your portfolio</p>
         </article>
 
         {isHydrated && cards.length === 0 ? (
@@ -47,8 +78,30 @@ export default function CollectionPage() {
           </article>
         ) : null}
 
+        {isHydrated && cards.length > 0 ? (
+          <article className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-white">Portfolio preview</p>
+                <p className="text-xs text-zinc-500">
+                  {showFullPortfolio ? "All cards in your collection" : "Top cards by collection value"}
+                </p>
+              </div>
+              {cards.length > PORTFOLIO_PREVIEW_LIMIT ? (
+                <button
+                  type="button"
+                  onClick={() => setShowFullPortfolio((current) => !current)}
+                  className="rounded-full border border-[#28303b] bg-[#111722] px-3 py-1.5 text-xs font-medium text-[#7dd3fc]"
+                >
+                  {showFullPortfolio ? "Show top" : "View all"}
+                </button>
+              ) : null}
+            </div>
+          </article>
+        ) : null}
+
         <article className="grid grid-cols-2 gap-2.5">
-          {cards.map(({ card, quantity }) => (
+          {displayedCards.map(({ card, quantity }) => (
             <div key={card.id} className="rounded-xl border border-[#292929] bg-[#15161a] p-2.5">
               {(() => {
                 const hasImageUrl = card.image.startsWith("http://") || card.image.startsWith("https://");
@@ -56,7 +109,7 @@ export default function CollectionPage() {
 
                 return (
                   <>
-                    <Link href={`/cards/${card.id}`} className="block">
+                    <Link href={`/detail?type=card&id=${card.id}`} className="block">
                       <div className="overflow-hidden rounded-lg border border-[#2d2d2d] bg-[#101114]">
                         {hasImageUrl ? (
                           <img src={card.image} alt={card.name} className="h-28 w-full object-contain" />

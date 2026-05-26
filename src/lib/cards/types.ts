@@ -5,6 +5,24 @@ export type CardPricePoint = {
   value: number;
 };
 
+export type CardAttack = {
+  name: string;
+  cost: string[];
+  convertedEnergyCost: number;
+  damage: string;
+  text: string;
+};
+
+export type CardWeakness = {
+  type: string;
+  value: string;
+};
+
+export type CardPagination = {
+  page?: number;
+  pageSize?: number;
+};
+
 export type CardPriceBreakdown = {
   low?: number;
   mid?: number;
@@ -27,12 +45,18 @@ export type Card = {
   type: string;
   types?: string[];
   supertype?: string;
+  artist?: string;
+  hp?: string;
+  attacks?: CardAttack[];
+  weaknesses?: CardWeakness[];
   setId?: string;
   set: string;
   releaseDate?: string;
   number: string;
   rarity: string;
   image: string;
+  imageSmall?: string;
+  imageLarge?: string;
   marketValue: number | null;
   pricing?: CardPricing;
   tcgplayerPrices?: Record<string, CardPriceBreakdown>;
@@ -49,8 +73,11 @@ export type CardSet = {
   name: string;
   era: string;
   releaseYear: number;
+  releaseDate?: string;
   icon: string;
   totalCards: number;
+  imageSymbol?: string;
+  imageLogo?: string;
 };
 
 export type PriceSummary = {
@@ -62,7 +89,7 @@ export type PriceSummary = {
   history: CardPricePoint[];
 };
 
-export type DealVerdict = "GOOD BUY" | "FAIR PRICE" | "OVERPRICED";
+export type DealVerdict = "STRONG BUY" | "GOOD DEAL" | "FAIR PRICE" | "OVERPRICED" | "AVOID";
 
 export type DealDataQuality = "live-data" | "limited-data" | "demo-fallback" | "price-unavailable";
 
@@ -88,11 +115,11 @@ export type DealCheckResult = {
 };
 
 export type CardService = {
-  searchCards: (query: string) => Promise<Card[]>;
+  searchCards: (query: string, pagination?: CardPagination) => Promise<Card[]>;
   getCardById: (id: string) => Promise<Card | undefined>;
-  getSets: () => Promise<CardSet[]>;
+  getSets: (pagination?: CardPagination) => Promise<CardSet[]>;
   getSetById: (setId: string) => Promise<CardSet | undefined>;
-  getCardsBySet: (setId: string) => Promise<Card[]>;
+  getCardsBySet: (setId: string, pagination?: CardPagination) => Promise<Card[]>;
   getPriceSummary: (cardId: string) => PriceSummary | undefined;
   getDealCheck: (cardId: string, askingPrice: number) => DealCheckResult | undefined;
 };

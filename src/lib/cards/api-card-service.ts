@@ -39,21 +39,10 @@ async function fallbackGetCardById(id: string) {
   return mockCardService.getCardById(id);
 }
 
-async function fallbackGetSets() {
-  return mockCardService.getSets();
-}
-
-async function fallbackGetSetById(setId: string) {
-  return mockCardService.getSetById(setId);
-}
-
-async function fallbackGetCardsBySet(setId: string) {
-  return mockCardService.getCardsBySet(setId);
-}
-
 export const apiCardService: CardService = {
-  async searchCards(query) {
-    const cached = getCachedSearch(query);
+  async searchCards(query, pagination) {
+    const useDefaultSearchCache = !pagination?.page && !pagination?.pageSize;
+    const cached = useDefaultSearchCache ? getCachedSearch(query) : undefined;
 
     if (cached) {
       return cached;
@@ -61,10 +50,12 @@ export const apiCardService: CardService = {
 
     try {
       const providerQuery = buildPokemonCardSearchQuery(query);
-      const cards = (await searchPokemonCards(providerQuery)).map(normalizePokemonCard);
+      const cards = (await searchPokemonCards(providerQuery, pagination)).map(normalizePokemonCard);
 
       cacheCards(cards);
-      cacheSearch(query, cards);
+      if (useDefaultSearchCache) {
+        cacheSearch(query, cards);
+      }
       return cards;
     } catch {
       return fallbackSearch(query);
@@ -87,13 +78,13 @@ export const apiCardService: CardService = {
     }
   },
 
-  async getSets() {
+  async getSets(pagination) {
     try {
-      const sets = (await fetchPokemonSets()).map(normalizePokemonSet);
+      const sets = (await fetchPokemonSets(pagination)).map(normalizePokemonSet);
       cacheSets(sets);
       return sets;
     } catch {
-      return fallbackGetSets();
+      return [];
     }
   },
 
@@ -109,24 +100,27 @@ export const apiCardService: CardService = {
       cacheSet(set);
       return set;
     } catch {
-      return fallbackGetSetById(setId);
+      return undefined;
     }
   },
 
-  async getCardsBySet(setId) {
-    const cached = getCachedSetCards(setId);
+  async getCardsBySet(setId, pagination) {
+    const useDefaultSetCache = !pagination?.page && !pagination?.pageSize;
+    const cached = useDefaultSetCache ? getCachedSetCards(setId) : undefined;
 
     if (cached) {
       return cached;
     }
 
     try {
-      const cards = (await fetchPokemonCardsBySet(setId)).map(normalizePokemonCard);
+      const cards = (await fetchPokemonCardsBySet(setId, pagination)).map(normalizePokemonCard);
       cacheCards(cards);
-      cacheSetCards(setId, cards);
+      if (useDefaultSetCache) {
+        cacheSetCards(setId, cards);
+      }
       return cards;
     } catch {
-      return fallbackGetCardsBySet(setId);
+      return [];
     }
   },
 

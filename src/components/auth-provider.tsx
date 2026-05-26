@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
@@ -23,7 +23,9 @@ type AuthContextValue = {
   isLoading: boolean;
   isSupabaseConfigured: boolean;
   signInWithMagicLink: (email: string) => Promise<string | null>;
+  signInWithGoogle: () => Promise<string | null>;
   signOut: () => Promise<void>;
+  refreshSession: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 };
 
@@ -38,7 +40,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const supabase = useMemo(() => getSupabaseBrowserClient(), []);
   const isSupabaseConfigured = Boolean(supabase);
 
-  const loadProfile = async (nextUser: User | null) => {
+  const getAuthRedirectTo = () => {
+    if (typeof window === "undefined") {
+      return "";
+    }
+
+    const isNativePlatform = Boolean((window as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.());
+
+    if (isNativePlatform) {
+      return "com.smartcollector.app://auth/callback";
+    }
+
+    return `${window.location.origin}/auth/callback`;
+  };
+
+  const loadProfile = useCallback(async (nextUser: User | null) => {
     if (!supabase || !nextUser) {
       setProfile(null);
       return;
@@ -58,7 +74,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     setProfile((data as UserProfile | null) ?? null);
-  };
+  }, [supabase]);
+
+  const syncSession = useCallback(async () => {
+    if (!supabase) {
+      setIsLoading(false);
+      return;
+    }
+
+    const { data } = await supabase.auth.getSession();
+    let nextSession = data.session ?? null;
+
+    if (!nextSession) {
+      const { data: refreshedData } = await supabase.auth.refreshSession();
+      nextSession = refreshedData.session ?? null;
+    }
+
+    setSession(nextSession);
+    setUser(nextSession?.user ?? null);
+    await loadProfile(nextSession?.user ?? null);
+    setIsLoading(false);
+  }, [loadProfile, supabase]);
 
   useEffect(() => {
     if (!supabase) {
@@ -68,20 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     let mounted = true;
 
-    const bootstrap = async () => {
-      const { data } = await supabase.auth.getSession();
-
-      if (!mounted) {
-        return;
-      }
-
-      setSession(data.session ?? null);
-      setUser(data.session?.user ?? null);
-      await loadProfile(data.session?.user ?? null);
-      setIsLoading(false);
-    };
-
-    bootstrap();
+    void syncSession();
 
     const {
       data: { subscription },
@@ -92,11 +115,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
     });
 
+    const handleSessionRefreshEvent = () => {
+      if (!mounted) {
+        return;
+      }
+
+      void syncSession();
+    };
+
+    const handleVisibilityChange = () => {
+      if (!mounted || document.visibilityState !== "visible") {
+        return;
+      }
+
+      void syncSession();
+    };
+
+    window.addEventListener("collectiq:auth-session-updated", handleSessionRefreshEvent);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     return () => {
       mounted = false;
       subscription.unsubscribe();
+      window.removeEventListener("collectiq:auth-session-updated", handleSessionRefreshEvent);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [supabase]);
+  }, [loadProfile, supabase, syncSession]);
+
+  const refreshSession = useCallback(async () => {
+    await syncSession();
+  }, [syncSession]);
+
+  const refreshProfile = useCallback(async () => {
+    await loadProfile(user);
+  }, [loadProfile, user]);
 
   const value = useMemo<AuthContextValue>(() => {
     return {
@@ -110,11 +162,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return "Supabase is not configured.";
         }
 
-        const redirectTo = `${window.location.origin}/auth/callback`;
+        const redirectTo = getAuthRedirectTo();
         const { error } = await supabase.auth.signInWithOtp({
           email,
           options: {
             emailRedirectTo: redirectTo,
+          },
+        });
+
+        return error?.message ?? null;
+      },
+      signInWithGoogle: async () => {
+        if (!supabase) {
+          return "Supabase is not configured.";
+        }
+
+        const redirectTo = getAuthRedirectTo();
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: "google",
+          options: {
+            redirectTo,
           },
         });
 
@@ -127,11 +194,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         await supabase.auth.signOut();
       },
-      refreshProfile: async () => {
-        await loadProfile(user);
-      },
+      refreshSession,
+      refreshProfile,
     };
-  }, [isLoading, isSupabaseConfigured, profile, session, supabase, user]);
+  }, [isLoading, isSupabaseConfigured, profile, refreshProfile, refreshSession, session, supabase, user]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

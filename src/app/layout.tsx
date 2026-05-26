@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { AuthProvider } from "@/components/auth-provider";
+import { AuthDeepLinkListener } from "@/components/auth-deep-link-listener";
 import { CurrencySettingsSync } from "@/components/currency-settings-sync";
 import { Geist, Geist_Mono } from "next/font/google";
 import { CollectionProvider } from "@/components/collection-provider";
@@ -42,6 +43,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#0b0c0f",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -56,6 +58,7 @@ export default function RootLayout({
     >
       <body className="min-h-full bg-[#0b0c0f] text-zinc-100">
         <AuthProvider>
+          <AuthDeepLinkListener />
           <CurrencyProvider>
             <CurrencySettingsSync />
             <PwaRegister />

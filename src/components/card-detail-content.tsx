@@ -56,7 +56,7 @@ export function CardDetailContent({ card }: CardDetailContentProps) {
           </Link>
           {relatedSet ? (
             <Link
-              href={`/sets/${relatedSet.id}`}
+              href={`/detail?type=set&id=${relatedSet.id}`}
               className="inline-flex w-full items-center justify-center rounded-xl border border-[#2f2f2f] bg-[#121317] px-4 py-3 text-sm font-medium text-zinc-200"
             >
               Browse {card.set}

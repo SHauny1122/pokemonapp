@@ -101,6 +101,31 @@ function deriveTrend(cardmarket: CardPriceBreakdown | undefined): PriceTrend {
   return "flat";
 }
 
+function mapAttacks(attacks: PokemonTcgCardRecord["attacks"]) {
+  if (!attacks || attacks.length === 0) {
+    return undefined;
+  }
+
+  return attacks.map((attack) => ({
+    name: attack.name ?? "",
+    cost: attack.cost ?? [],
+    convertedEnergyCost: attack.convertedEnergyCost ?? 0,
+    damage: attack.damage ?? "",
+    text: attack.text ?? "",
+  }));
+}
+
+function mapWeaknesses(weaknesses: PokemonTcgCardRecord["weaknesses"]) {
+  if (!weaknesses || weaknesses.length === 0) {
+    return undefined;
+  }
+
+  return weaknesses.map((weakness) => ({
+    type: weakness.type ?? "",
+    value: weakness.value ?? "",
+  }));
+}
+
 function computeFlipScore(
   rarity: string | undefined,
   marketValue: number | null,
@@ -122,8 +147,11 @@ export function normalizePokemonSet(rawSet: PokemonTcgSetRecord): CardSet {
     name: rawSet.name,
     era: rawSet.series ?? "Pokemon TCG",
     releaseYear: Number(rawSet.releaseDate?.slice(0, 4)) || new Date().getFullYear(),
+    releaseDate: rawSet.releaseDate,
     icon: "🃏",
     totalCards: rawSet.total ?? rawSet.printedTotal ?? 0,
+    imageSymbol: rawSet.images?.symbol,
+    imageLogo: rawSet.images?.logo,
   };
 }
 
@@ -159,12 +187,18 @@ export function normalizePokemonCard(rawCard: PokemonTcgCardRecord): Card {
     type: rawCard.types?.[0] ?? "Unknown",
     types: rawCard.types,
     supertype: rawCard.supertype,
+    artist: rawCard.artist,
+    hp: rawCard.hp,
+    attacks: mapAttacks(rawCard.attacks),
+    weaknesses: mapWeaknesses(rawCard.weaknesses),
     setId: rawCard.set.id,
     set: rawCard.set.name,
     releaseDate: rawCard.set.releaseDate,
     number: rawCard.number,
     rarity: rawCard.rarity ?? "Unknown",
     image: rawCard.images?.small ?? rawCard.images?.large ?? "",
+    imageSmall: rawCard.images?.small,
+    imageLarge: rawCard.images?.large,
     marketValue,
     pricing,
     tcgplayerPrices: Object.keys(tcgplayerVariants).length > 0 ? tcgplayerVariants : undefined,

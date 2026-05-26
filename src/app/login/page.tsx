@@ -1,14 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { MobileShell } from "@/components/mobile-shell";
 
 export default function LoginPage() {
-  const { isSupabaseConfigured, signInWithMagicLink, user, isLoading } = useAuth();
+  const { isSupabaseConfigured, signInWithMagicLink, signInWithGoogle, user, isLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const emailValid = useMemo(() => email.includes("@") && email.includes("."), [email]);
@@ -31,6 +32,35 @@ export default function LoginPage() {
     setIsSubmitting(false);
   };
 
+  const submitGoogle = async () => {
+    if (isGoogleSubmitting) {
+      return;
+    }
+
+    setIsGoogleSubmitting(true);
+    setFeedback(null);
+    const error = await signInWithGoogle();
+
+    if (error) {
+      setFeedback(error);
+      setIsGoogleSubmitting(false);
+    }
+  };
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        setIsGoogleSubmitting(false);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
+
   return (
     <MobileShell title="Sign In" subtitle="Sync your collection and subscription across devices." showBackButton backFallbackHref="/profile">
       <section className="space-y-4">
@@ -42,7 +72,28 @@ export default function LoginPage() {
 
         <article className="rounded-2xl border border-[#2a2b2f] bg-[#15171b] p-4">
           <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">Account Access</p>
-          <h2 className="mt-2 text-lg font-semibold text-white">Continue with Email</h2>
+          <h2 className="mt-2 text-lg font-semibold text-white">Sign up or log in</h2>
+          <p className="mt-1 text-sm text-zinc-400">Use Google for one-tap access, or continue with email magic link.</p>
+
+          <button
+            type="button"
+            onClick={() => {
+              void submitGoogle();
+            }}
+            disabled={!isSupabaseConfigured || isGoogleSubmitting}
+            className={`mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold ${
+              !isSupabaseConfigured || isGoogleSubmitting
+                ? "border border-[#35383f] bg-[#171a22] text-zinc-500"
+                : "border border-[#363941] bg-[#20242d] text-white"
+            }`}
+          >
+            <span aria-hidden="true">G</span>
+            {isGoogleSubmitting ? "Opening Google..." : "Continue with Google"}
+          </button>
+
+          <div className="my-4 h-px w-full bg-[#2a2b2f]" />
+
+          <h2 className="text-lg font-semibold text-white">Continue with Email</h2>
           <p className="mt-1 text-sm text-zinc-400">
             We will email you a secure magic link. No password required for this phase.
           </p>
@@ -76,6 +127,9 @@ export default function LoginPage() {
 
         <article className="rounded-2xl border border-[#2a2b2f] bg-[#15171b] p-4 text-sm text-zinc-300">
           <p>Current session: {isLoading ? "Checking..." : user ? user.email : "Not signed in"}</p>
+          <Link href="/search" className="mt-2 inline-flex text-sm text-zinc-300">
+            Skip for now
+          </Link>
           <Link href="/profile" className="mt-2 inline-flex text-sm text-[#e1b54f]">
             Return to Profile
           </Link>

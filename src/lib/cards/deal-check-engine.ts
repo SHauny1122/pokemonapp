@@ -27,11 +27,19 @@ function getPriceSources(card: Card): DealPriceSource[] {
 }
 
 function getVerdictFromPriceGap(priceGapPercent: number): DealVerdict {
-  if (priceGapPercent <= -12) {
-    return "GOOD BUY";
+  if (priceGapPercent <= -25) {
+    return "STRONG BUY";
   }
 
-  if (priceGapPercent >= 12) {
+  if (priceGapPercent <= -8) {
+    return "GOOD DEAL";
+  }
+
+  if (priceGapPercent >= 25) {
+    return "AVOID";
+  }
+
+  if (priceGapPercent >= 8) {
     return "OVERPRICED";
   }
 
@@ -51,15 +59,23 @@ function getConfidenceForSources(sourceCount: number) {
 }
 
 function getExplanation(verdict: DealVerdict, differencePercent: number) {
-  if (verdict === "GOOD BUY") {
-    return `Asking price is ${Math.abs(differencePercent).toFixed(1)}% below current live market price.`;
+  if (verdict === "STRONG BUY") {
+    return `Seller price is ${Math.abs(differencePercent).toFixed(1)}% below the current market price. This looks unusually favorable, but still check condition and seller trust.`;
+  }
+
+  if (verdict === "GOOD DEAL") {
+    return `Seller price is ${Math.abs(differencePercent).toFixed(1)}% below the current market price. This may be a good buy if the card condition checks out.`;
   }
 
   if (verdict === "OVERPRICED") {
-    return `Asking price is ${differencePercent.toFixed(1)}% above current live market price.`;
+    return `Seller price is ${differencePercent.toFixed(1)}% above the current market price. You may want to negotiate or compare other listings.`;
   }
 
-  return "Asking price is close to the currently available live market price.";
+  if (verdict === "AVOID") {
+    return `Seller price is ${differencePercent.toFixed(1)}% above the current market price. This looks too expensive based on available pricing data.`;
+  }
+
+  return "Seller price is close to the current market price. This looks fair, assuming the card condition matches the listing.";
 }
 
 export function evaluateDealCheck(card: Card, askingPrice: number): DealCheckResult | undefined {

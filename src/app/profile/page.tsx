@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useEffect, useRef } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { useCollection } from "@/components/collection-provider";
 import { useCurrency } from "@/components/currency-provider";
@@ -9,35 +9,19 @@ import { CurrencySelector } from "@/components/currency-selector";
 import { MobileShell } from "@/components/mobile-shell";
 
 export default function ProfilePage() {
-  const { cards, totalCards, totalValue, isHydrated } = useCollection();
+  const { totalCards, totalValue, isHydrated } = useCollection();
   const { formatUsd, selectedCurrency } = useCurrency();
-  const { user, profile, signOut, isLoading, isSupabaseConfigured } = useAuth();
+  const { user, profile, signOut, isLoading, isSupabaseConfigured, refreshSession } = useAuth();
+  const hasRequestedRefreshRef = useRef(false);
 
-  const mostValuablePosition = useMemo(() => {
-    return cards.reduce<{
-      name: string;
-      marketValue: number;
-      quantity: number;
-    } | null>((best, entry) => {
-      if (entry.card.marketValue === null) {
-        return best;
-      }
+  useEffect(() => {
+    if (!isSupabaseConfigured || isLoading || user || hasRequestedRefreshRef.current) {
+      return;
+    }
 
-      const positionValue = entry.card.marketValue * entry.quantity;
-
-      if (!best || positionValue > best.marketValue * best.quantity) {
-        return {
-          name: entry.card.name,
-          marketValue: entry.card.marketValue,
-          quantity: entry.quantity,
-        };
-      }
-
-      return best;
-    }, null);
-  }, [cards]);
-
-  const uniqueCards = cards.length;
+    hasRequestedRefreshRef.current = true;
+    void refreshSession();
+  }, [isLoading, isSupabaseConfigured, refreshSession, user]);
 
   return (
     <MobileShell title="Profile" subtitle="Private collector dashboard.">
@@ -142,29 +126,6 @@ export default function ProfilePage() {
             <div className="rounded-xl border border-[#30323a] bg-[#11131a] p-3">
               <p className="text-zinc-400">Graded Cards</p>
               <p className="mt-1 text-lg font-semibold text-white">0</p>
-            </div>
-          </div>
-        </article>
-
-        <article className="rounded-2xl border border-[#2a2b2f] bg-[#15171b] p-4">
-          <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">Portfolio Overview</p>
-          <div className="mt-2 rounded-xl border border-[#30323a] bg-[#11131a] p-3">
-            <p className="text-sm font-semibold text-white">Main Collection</p>
-            <div className="mt-2 flex items-center justify-between text-sm">
-              <span className="text-zinc-400">Total value</span>
-              <span className="font-semibold text-white">{isHydrated ? formatUsd(totalValue) : "..."}</span>
-            </div>
-            <div className="mt-1 flex items-center justify-between text-sm">
-              <span className="text-zinc-400">Unique cards</span>
-              <span className="font-semibold text-white">{isHydrated ? uniqueCards : 0}</span>
-            </div>
-            <div className="mt-1 flex items-center justify-between text-sm">
-              <span className="text-zinc-400">Best position</span>
-              <span className="max-w-[60%] truncate text-right font-semibold text-[#e1b54f]">
-                {mostValuablePosition
-                  ? `${mostValuablePosition.name} (${formatUsd(mostValuablePosition.marketValue)})`
-                  : "No priced cards yet"}
-              </span>
             </div>
           </div>
         </article>
