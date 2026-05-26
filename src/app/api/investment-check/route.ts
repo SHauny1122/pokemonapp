@@ -17,6 +17,12 @@ type InvestmentCheckRequestBody = {
   variantId?: string;
 };
 
+const corsHeaders = {
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Origin": "*",
+};
+
 function isInvestmentDebugEnabled() {
   return process.env.DEBUG_INVESTMENT_CHECK === "true";
 }
@@ -29,13 +35,20 @@ function debugInvestmentCheck(message: string, payload?: Record<string, unknown>
   console.info(`[InvestmentCheck] ${message}`, payload ?? {});
 }
 
+export function OPTIONS() {
+  return new Response(null, {
+    headers: corsHeaders,
+    status: 204,
+  });
+}
+
 export async function POST(request: NextRequest) {
   let body: InvestmentCheckRequestBody;
 
   try {
     body = (await request.json()) as InvestmentCheckRequestBody;
   } catch {
-    return Response.json({ error: "Invalid JSON body." }, { status: 400 });
+    return Response.json({ error: "Invalid JSON body." }, { headers: corsHeaders, status: 400 });
   }
 
   const cardId = body.cardId?.trim();
@@ -44,17 +57,17 @@ export async function POST(request: NextRequest) {
   const currencyCode = isSupportedCurrencyCode(requestedCurrencyCode) ? requestedCurrencyCode : DEFAULT_CURRENCY_CODE;
 
   if (!cardId) {
-    return Response.json({ error: "cardId is required." }, { status: 400 });
+    return Response.json({ error: "cardId is required." }, { headers: corsHeaders, status: 400 });
   }
 
   if (!Number.isFinite(purchasePrice) || purchasePrice <= 0) {
-    return Response.json({ error: "purchasePrice must be a positive number." }, { status: 400 });
+    return Response.json({ error: "purchasePrice must be a positive number." }, { headers: corsHeaders, status: 400 });
   }
 
   const card = await getCardById(cardId);
 
   if (!card) {
-    return Response.json({ error: "Card not found." }, { status: 404 });
+    return Response.json({ error: "Card not found." }, { headers: corsHeaders, status: 404 });
   }
 
   const purchasePriceUsd = convertCurrencyToUsd(purchasePrice, currencyCode);
@@ -98,7 +111,8 @@ export async function POST(request: NextRequest) {
         purchasePriceUsd,
         providerData,
         isProviderConfigured,
-      })
+      }),
+      { headers: corsHeaders }
     );
   } catch (error) {
     debugInvestmentCheck("Provider fetch failed", {
@@ -112,7 +126,8 @@ export async function POST(request: NextRequest) {
         card,
         purchasePriceUsd,
         isProviderConfigured,
-      })
+      }),
+      { headers: corsHeaders }
     );
   }
 }

@@ -20,8 +20,20 @@ const SEARCH_DEBOUNCE_MS = 350;
 const SEARCH_RESULT_LIMIT = 10;
 const INVESTMENT_SEARCH_PAGE_SIZE = 50;
 const SET_CARD_LIMIT = 80;
+const SHOW_INVESTMENT_DEBUG =
+  process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_SHOW_INVESTMENT_DEBUG === "true";
 
 type DealCheckMode = "deal-analyzer" | "investment-check";
+
+type InvestmentDebugInfo = {
+  activeListings?: number;
+  error?: string | null;
+  fairValueUsd?: number | null;
+  priceHistoryPoints?: number;
+  recentSales?: number;
+  status?: number;
+  url: string | null;
+};
 
 function getCardImage(card: Card) {
   return card.imageSmall ?? card.image;
@@ -547,6 +559,7 @@ function InvestmentCheckMode() {
   const [isAnalyzingInvestment, setIsAnalyzingInvestment] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [investmentDebugInfo, setInvestmentDebugInfo] = useState<InvestmentDebugInfo | null>(null);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -646,10 +659,16 @@ function InvestmentCheckMode() {
       return;
     }
 
+    let investmentApiUrl: string | null = null;
+
     try {
       setIsAnalyzingInvestment(true);
       setAnalysisError(null);
-      const investmentApiUrl = getInvestmentCheckApiUrl();
+      investmentApiUrl = getInvestmentCheckApiUrl();
+      setInvestmentDebugInfo({
+        error: null,
+        url: investmentApiUrl,
+      });
 
       console.info("[InvestmentCheck] request", {
         url: investmentApiUrl ?? null,
@@ -665,6 +684,10 @@ function InvestmentCheckMode() {
       });
 
       if (!investmentApiUrl) {
+        setInvestmentDebugInfo({
+          error: "API URL is not configured for this build.",
+          url: null,
+        });
         throw new Error("Investment Check API URL is not configured for this app build.");
       }
 
@@ -685,6 +708,10 @@ function InvestmentCheckMode() {
         ok: response.ok,
         status: response.status,
       });
+      setInvestmentDebugInfo((current) => ({
+        ...(current ?? { url: investmentApiUrl }),
+        status: response.status,
+      }));
 
       if (!response.ok) {
         throw new Error(`Investment analysis failed with ${response.status}.`);
@@ -699,12 +726,26 @@ function InvestmentCheckMode() {
         recentSales: result.recentSales.length,
         dataQuality: result.dataQuality,
       });
+      setInvestmentDebugInfo({
+        activeListings: result.activeListings.length,
+        error: null,
+        fairValueUsd: result.fairValueUsd,
+        priceHistoryPoints: result.priceHistory.length,
+        recentSales: result.recentSales.length,
+        status: response.status,
+        url: investmentApiUrl,
+      });
 
       setInvestmentResult(result);
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown investment check error";
       console.info("[InvestmentCheck] request failed", {
-        message: error instanceof Error ? error.message : "Unknown investment check error",
+        message,
       });
+      setInvestmentDebugInfo((current) => ({
+        ...(current ?? { url: investmentApiUrl }),
+        error: message,
+      }));
       setInvestmentResult(null);
       setAnalysisError("Market data could not be reached. Please check connection and try again.");
     } finally {
@@ -808,6 +849,18 @@ function InvestmentCheckMode() {
         ) : null}
         {analysisError ? (
           <div className="rounded-xl border border-rose-400/20 bg-rose-400/10 p-3 text-sm text-rose-200">{analysisError}</div>
+        ) : null}
+        {SHOW_INVESTMENT_DEBUG && investmentDebugInfo ? (
+          <div className="space-y-1 rounded-xl border border-[#303640] bg-[#101318] p-3 text-xs leading-5 text-zinc-400">
+            <p className="font-semibold text-zinc-300">Investment API debug</p>
+            <p>URL: {investmentDebugInfo.url ?? "Not configured"}</p>
+            <p>Status: {investmentDebugInfo.status ?? "Not reached"}</p>
+            {investmentDebugInfo.error ? <p>Error: {investmentDebugInfo.error}</p> : null}
+            {typeof investmentDebugInfo.fairValueUsd === "number" ? <p>Fair value: ${investmentDebugInfo.fairValueUsd.toFixed(2)}</p> : null}
+            {typeof investmentDebugInfo.priceHistoryPoints === "number" ? <p>History points: {investmentDebugInfo.priceHistoryPoints}</p> : null}
+            {typeof investmentDebugInfo.activeListings === "number" ? <p>Listings/variants: {investmentDebugInfo.activeListings}</p> : null}
+            {typeof investmentDebugInfo.recentSales === "number" ? <p>Sold comps: {investmentDebugInfo.recentSales}</p> : null}
+          </div>
         ) : null}
       </article>
 
