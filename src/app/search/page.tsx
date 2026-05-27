@@ -9,6 +9,7 @@ import { getSets, searchCards } from "@/lib/cards/card-service";
 import { getCatalogDebugState } from "@/lib/cards/api-card-service";
 
 const SEARCH_DEBOUNCE_MS = 400;
+const DISCOVER_SET_PREVIEW_PAGE_SIZE = 80;
 
 type SortOption =
   | "trending"
@@ -197,7 +198,7 @@ export default function SearchPage() {
       try {
         setIsLoadingSets(true);
         setSetsError(null);
-        const nextSets = await getSets();
+        const nextSets = await getSets({ page: 1, pageSize: DISCOVER_SET_PREVIEW_PAGE_SIZE });
 
         if (!cancelled) {
           setSets(nextSets);

@@ -135,8 +135,9 @@ export const apiCardService: CardService = {
       setCatalogDebug("getSets", sets.length > 0 ? "success" : "empty", sets.length > 0 ? null : "Set catalog returned an empty response.");
       return sets;
     } catch (error) {
-      setCatalogDebug("getSets", "failed", `Set catalog API failed. ${getErrorMessage(error)}`);
-      return [];
+      const fallbackSets = await mockCardService.getSets(pagination);
+      setCatalogDebug("getSets", "fallback", `Set catalog API failed. Showing fallback sets. ${getErrorMessage(error)}`);
+      return fallbackSets;
     }
   },
 
@@ -153,8 +154,8 @@ export const apiCardService: CardService = {
       setCatalogDebug("getSetById", "success", null);
       return set;
     } catch (error) {
-      setCatalogDebug("getSetById", "failed", `Set lookup API failed. ${getErrorMessage(error)}`);
-      return undefined;
+      setCatalogDebug("getSetById", "fallback", `Set lookup API failed. Showing fallback set if available. ${getErrorMessage(error)}`);
+      return mockCardService.getSetById(setId);
     }
   },
 
@@ -175,8 +176,9 @@ export const apiCardService: CardService = {
       setCatalogDebug("getCardsBySet", cards.length > 0 ? "success" : "empty", cards.length > 0 ? null : "Set cards returned an empty response.");
       return cards;
     } catch (error) {
-      setCatalogDebug("getCardsBySet", "failed", `Set cards API failed. ${getErrorMessage(error)}`);
-      return [];
+      const fallbackCards = await mockCardService.getCardsBySet(setId, pagination);
+      setCatalogDebug("getCardsBySet", "fallback", `Set cards API failed. Showing fallback cards if available. ${getErrorMessage(error)}`);
+      return fallbackCards;
     }
   },
 
