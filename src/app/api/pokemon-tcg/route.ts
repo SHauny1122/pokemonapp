@@ -244,6 +244,15 @@ async function proxyPokemonTcgRequest(request: NextRequest, rawPath: string) {
     return responseFromCache(cached, corsHeaders);
   }
 
+  const searchParams = new URLSearchParams(rawSearch);
+  if (root === "cards" && !path[1] && !searchParams.get("q")) {
+    const trendingResponse = getFallbackResponse(path, rawSearch, corsHeaders, "Showing cached trending seed cards.");
+    if (trendingResponse) {
+      await cacheProxyResponse(cacheKey, root, trendingResponse);
+      return trendingResponse;
+    }
+  }
+
   const headers: Record<string, string> = {
     Accept: "application/json",
   };
