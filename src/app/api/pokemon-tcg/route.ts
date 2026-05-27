@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 
 const POKEMON_TCG_API_BASE_URL = "https://api.pokemontcg.io/v2";
-const UPSTREAM_TIMEOUT_MS = 12000;
+const UPSTREAM_TIMEOUT_MS = 20000;
 
 export const dynamic = "force-static";
 

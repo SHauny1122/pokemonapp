@@ -313,9 +313,8 @@ export const pokemonTCGProvider: PokemonTCGProvider = {
   async fetchSets(pagination?: CardPagination) {
     const page = clampPage(pagination?.page);
     const pageSize = clampPageSize(pagination?.pageSize, DEFAULT_SETS_PAGE_SIZE);
-    const englishSetsQuery = encodeURIComponent("ptcgoCode:*");
     const payload = await fetchPokemonTcgJson<PokemonTcgDataPayload<PokemonTcgSetRecord[]>>(
-      `/sets?page=${page}&pageSize=${pageSize}&q=${englishSetsQuery}`
+      `/sets?page=${page}&pageSize=${pageSize}`
     );
 
     return {
