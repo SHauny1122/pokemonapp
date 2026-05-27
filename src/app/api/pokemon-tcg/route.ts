@@ -1,20 +1,51 @@
 import { NextRequest } from "next/server";
 
 const POKEMON_TCG_API_BASE_URL = "https://api.pokemontcg.io/v2";
+const UPSTREAM_TIMEOUT_MS = 12000;
 
-const corsHeaders = {
-  "Access-Control-Allow-Headers": "Content-Type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Origin": "*",
-};
+export const dynamic = "force-static";
 
 const allowedRoots = new Set(["cards", "sets"]);
+const allowedOrigins = new Set([
+  "capacitor://localhost",
+  "http://localhost",
+  "https://localhost",
+  "https://pokemonapp-rho.vercel.app",
+]);
 
-export function OPTIONS() {
+function getCorsHeaders(request?: NextRequest) {
+  const origin = request?.headers.get("origin") ?? "";
+  const allowedOrigin =
+    allowedOrigins.has(origin) || origin.startsWith("capacitor://") || origin.startsWith("ionic://")
+      ? origin
+      : "*";
+
+  return {
+    "Access-Control-Allow-Headers": "Content-Type, Accept",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Max-Age": "86400",
+    "Vary": "Origin",
+  };
+}
+
+export function OPTIONS(request: NextRequest) {
   return new Response(null, {
-    headers: corsHeaders,
+    headers: getCorsHeaders(request),
     status: 204,
   });
+}
+
+export function GET(request: NextRequest) {
+  return Response.json(
+    {
+      ok: true,
+      route: "/api/pokemon-tcg",
+      methods: ["GET", "POST", "OPTIONS"],
+      postExample: { path: "/sets?page=1&pageSize=1&q=ptcgoCode%3A*" },
+    },
+    { headers: getCorsHeaders(request) }
+  );
 }
 
 type PokemonTcgProxyRequestBody = {
@@ -22,6 +53,7 @@ type PokemonTcgProxyRequestBody = {
 };
 
 export async function POST(request: NextRequest) {
+  const corsHeaders = getCorsHeaders(request);
   let body: PokemonTcgProxyRequestBody;
 
   try {
@@ -57,11 +89,20 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const response = await fetch(targetUrl, {
-      headers,
-      method: "GET",
-      next: { revalidate: 3600 },
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+    let response: Response;
+
+    try {
+      response = await fetch(targetUrl, {
+        cache: "no-store",
+        headers,
+        method: "GET",
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     const body = await response.text();
     return new Response(body, {
@@ -73,10 +114,17 @@ export async function POST(request: NextRequest) {
       status: response.status,
     });
   } catch (error) {
+    const message =
+      error instanceof Error && error.name === "AbortError"
+        ? `Pokemon TCG API request timed out after ${UPSTREAM_TIMEOUT_MS}ms.`
+        : error instanceof Error
+          ? error.message
+          : "Unknown error";
+
     return Response.json(
       {
         error: "Pokemon TCG API proxy request failed.",
-        detail: error instanceof Error ? error.message : "Unknown error",
+        detail: message,
       },
       { headers: corsHeaders, status: 502 }
     );
