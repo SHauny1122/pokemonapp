@@ -6,6 +6,7 @@ import { MobileShell } from "@/components/mobile-shell";
 import { useCollection } from "@/components/collection-provider";
 import { useCurrency } from "@/components/currency-provider";
 import { getSets } from "@/lib/cards/card-service";
+import { getCatalogDebugState } from "@/lib/cards/api-card-service";
 import { CardSet } from "@/lib/cards/types";
 
 const INITIAL_PAGE = 1;
@@ -29,6 +30,7 @@ export default function SetsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [debugMessage, setDebugMessage] = useState<string | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const collectionBySetId = useMemo(() => {
@@ -48,6 +50,7 @@ export default function SetsPage() {
     setIsLoading(true);
     try {
       const fetchedSets = await getSets({ page: pageNum, pageSize: PAGE_SIZE });
+      const debug = getCatalogDebugState();
 
       if (isReset) {
         setSets(fetchedSets);
@@ -62,7 +65,18 @@ export default function SetsPage() {
       }
 
       setHasMore(fetchedSets.length === PAGE_SIZE);
+      if (debug.status === "failed" || debug.status === "empty") {
+        setDebugMessage(
+          `${debug.message ?? "Set catalog issue."} Backend: ${debug.baseUrl || "unset"}. Status: ${debug.statusCode ?? "n/a"}.`
+        );
+      } else if (fetchedSets.length > 0) {
+        setDebugMessage(null);
+      }
     } catch {
+      const debug = getCatalogDebugState();
+      setDebugMessage(
+        `${debug.message ?? "Set catalog API failed."} Backend: ${debug.baseUrl || "unset"}. Status: ${debug.statusCode ?? "n/a"}.`
+      );
       setHasMore(false);
     } finally {
       setIsLoading(false);
@@ -71,7 +85,13 @@ export default function SetsPage() {
   };
 
   useEffect(() => {
-    loadSets(INITIAL_PAGE, true);
+    const timeoutId = window.setTimeout(() => {
+      loadSets(INITIAL_PAGE, true);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
   }, []);
 
   useEffect(() => {
@@ -111,6 +131,12 @@ export default function SetsPage() {
         <article className="rounded-2xl border border-[#27272a] bg-[#15161a] p-4 text-sm text-zinc-400">
           Tap any set to open its card list, then open a card for value, trust signal, and actions.
         </article>
+
+        {debugMessage ? (
+          <article className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-100">
+            Debug: {debugMessage}
+          </article>
+        ) : null}
 
         {isInitialLoad ? (
           <div className="flex justify-center py-8">

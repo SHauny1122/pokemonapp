@@ -1,16 +1,16 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { CardDetailContent } from "@/components/card-detail-content";
 import { MobileShell } from "@/components/mobile-shell";
 import { SetCardsList } from "@/components/set-cards-list";
 import { getCardById, getCardsBySet, getSetById } from "@/lib/cards/card-service";
+import { getCatalogDebugState } from "@/lib/cards/api-card-service";
 import { Card, CardSet } from "@/lib/cards/types";
 
 function DetailContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const type = searchParams.get("type");
   const id = searchParams.get("id");
   const [card, setCard] = useState<Card | null>(null);
@@ -18,6 +18,7 @@ function DetailContent() {
   const [cards, setCards] = useState<Card[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [debugMessage, setDebugMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -32,6 +33,10 @@ function DetailContent() {
           const cardData = await getCardById(id);
           if (!cardData) {
             setError("Card not found");
+            const debug = getCatalogDebugState();
+            setDebugMessage(
+              `${debug.message ?? "Card lookup returned no data."} Backend: ${debug.baseUrl || "unset"}. Status: ${debug.statusCode ?? "n/a"}.`
+            );
           } else {
             setCard(cardData);
           }
@@ -43,11 +48,17 @@ function DetailContent() {
             setSet(setData);
             const cardsData = await getCardsBySet(id);
             setCards(cardsData);
+            const debug = getCatalogDebugState();
+            if (debug.status === "failed" || debug.status === "empty") {
+              setDebugMessage(
+                `${debug.message ?? "Set cards issue."} Backend: ${debug.baseUrl || "unset"}. Status: ${debug.statusCode ?? "n/a"}.`
+              );
+            }
           }
         } else {
           setError("Invalid type. Must be 'card' or 'set'");
         }
-      } catch (err) {
+      } catch {
         setError("Failed to load data");
       } finally {
         setIsLoading(false);
@@ -73,6 +84,11 @@ function DetailContent() {
         <div className="rounded-2xl border border-[#27272a] bg-[#15161a] p-4 text-sm text-zinc-400">
           {error}
         </div>
+        {debugMessage ? (
+          <div className="mt-3 rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-100">
+            Debug: {debugMessage}
+          </div>
+        ) : null}
       </MobileShell>
     );
   }
@@ -90,6 +106,11 @@ function DetailContent() {
     return (
       <MobileShell title={set.name} subtitle={`${set.era} • ${set.releaseYear}`} showBackButton backFallbackHref="/sets">
         <section className="space-y-4">
+          {debugMessage ? (
+            <article className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-100">
+              Debug: {debugMessage}
+            </article>
+          ) : null}
           <article className="rounded-2xl border border-[#27272a] bg-[#15161a] p-4">
             <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">Set Summary</p>
             <div className="mt-2 flex items-center justify-between text-sm">

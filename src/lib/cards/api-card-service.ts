@@ -24,8 +24,54 @@ import {
   fetchPokemonCardsBySet,
   fetchPokemonSetById,
   fetchPokemonSets,
+  getPokemonTcgDebugInfo,
   searchPokemonCards,
 } from "@/lib/cards/providers/pokemon-tcg-provider";
+
+type CatalogDebugState = {
+  operation: string;
+  status: "idle" | "success" | "fallback" | "empty" | "failed";
+  message: string | null;
+  requestUrl: string | null;
+  statusCode: number | null;
+  baseUrl: string;
+  isNativeCapacitor: boolean;
+  isUsingBackendProxy: boolean;
+  hasApiBaseUrl: boolean;
+};
+
+const catalogDebugState: CatalogDebugState = {
+  operation: "idle",
+  status: "idle",
+  message: null,
+  requestUrl: null,
+  statusCode: null,
+  baseUrl: "",
+  isNativeCapacitor: false,
+  isUsingBackendProxy: false,
+  hasApiBaseUrl: false,
+};
+
+function setCatalogDebug(operation: string, status: CatalogDebugState["status"], message: string | null) {
+  const providerDebug = getPokemonTcgDebugInfo();
+  catalogDebugState.operation = operation;
+  catalogDebugState.status = status;
+  catalogDebugState.message = message;
+  catalogDebugState.requestUrl = providerDebug.lastRequestUrl;
+  catalogDebugState.statusCode = providerDebug.lastStatus;
+  catalogDebugState.baseUrl = providerDebug.baseUrl;
+  catalogDebugState.isNativeCapacitor = providerDebug.isNativeCapacitor;
+  catalogDebugState.isUsingBackendProxy = providerDebug.isUsingBackendProxy;
+  catalogDebugState.hasApiBaseUrl = providerDebug.hasApiBaseUrl;
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Unknown catalog error";
+}
+
+export function getCatalogDebugState() {
+  return { ...catalogDebugState };
+}
 
 export function getCachedApiCardById(id: string) {
   return getCachedCardById(id);
@@ -56,8 +102,10 @@ export const apiCardService: CardService = {
       if (useDefaultSearchCache) {
         cacheSearch(query, cards);
       }
+      setCatalogDebug("searchCards", cards.length > 0 ? "success" : "empty", cards.length > 0 ? null : "Search returned an empty response.");
       return cards;
-    } catch {
+    } catch (error) {
+      setCatalogDebug("searchCards", "fallback", `Live card search failed. Showing fallback data. ${getErrorMessage(error)}`);
       return fallbackSearch(query);
     }
   },
@@ -72,8 +120,10 @@ export const apiCardService: CardService = {
     try {
       const card = normalizePokemonCard(await fetchPokemonCardById(id));
       cacheCard(card);
+      setCatalogDebug("getCardById", "success", null);
       return card;
-    } catch {
+    } catch (error) {
+      setCatalogDebug("getCardById", "fallback", `Live card lookup failed. Showing fallback data if available. ${getErrorMessage(error)}`);
       return fallbackGetCardById(id);
     }
   },
@@ -82,8 +132,10 @@ export const apiCardService: CardService = {
     try {
       const sets = (await fetchPokemonSets(pagination)).map(normalizePokemonSet);
       cacheSets(sets);
+      setCatalogDebug("getSets", sets.length > 0 ? "success" : "empty", sets.length > 0 ? null : "Set catalog returned an empty response.");
       return sets;
-    } catch {
+    } catch (error) {
+      setCatalogDebug("getSets", "failed", `Set catalog API failed. ${getErrorMessage(error)}`);
       return [];
     }
   },
@@ -98,8 +150,10 @@ export const apiCardService: CardService = {
     try {
       const set = normalizePokemonSet(await fetchPokemonSetById(setId));
       cacheSet(set);
+      setCatalogDebug("getSetById", "success", null);
       return set;
-    } catch {
+    } catch (error) {
+      setCatalogDebug("getSetById", "failed", `Set lookup API failed. ${getErrorMessage(error)}`);
       return undefined;
     }
   },
@@ -118,8 +172,10 @@ export const apiCardService: CardService = {
       if (useDefaultSetCache) {
         cacheSetCards(setId, cards);
       }
+      setCatalogDebug("getCardsBySet", cards.length > 0 ? "success" : "empty", cards.length > 0 ? null : "Set cards returned an empty response.");
       return cards;
-    } catch {
+    } catch (error) {
+      setCatalogDebug("getCardsBySet", "failed", `Set cards API failed. ${getErrorMessage(error)}`);
       return [];
     }
   },

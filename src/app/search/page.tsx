@@ -6,6 +6,7 @@ import { MobileShell } from "@/components/mobile-shell";
 import { useCurrency } from "@/components/currency-provider";
 import { Card, CardSet } from "@/lib/cards/types";
 import { getSets, searchCards } from "@/lib/cards/card-service";
+import { getCatalogDebugState } from "@/lib/cards/api-card-service";
 
 const SEARCH_DEBOUNCE_MS = 400;
 
@@ -182,6 +183,7 @@ export default function SearchPage() {
   const [isLoadingSets, setIsLoadingSets] = useState(true);
   const [resultsError, setResultsError] = useState<string | null>(null);
   const [setsError, setSetsError] = useState<string | null>(null);
+  const [debugMessage, setDebugMessage] = useState<string | null>(null);
   const [sortOption, setSortOption] = useState<SortOption>("trending");
   const [isSortSheetOpen, setIsSortSheetOpen] = useState(false);
 
@@ -199,6 +201,12 @@ export default function SearchPage() {
 
         if (!cancelled) {
           setSets(nextSets);
+          const debug = getCatalogDebugState();
+          if (debug.status === "failed" || debug.status === "empty") {
+            setDebugMessage(
+              `${debug.message ?? "Set catalog issue."} Backend: ${debug.baseUrl || "unset"}. Status: ${debug.statusCode ?? "n/a"}.`
+            );
+          }
         }
       } catch {
         if (!cancelled) {
@@ -240,6 +248,14 @@ export default function SearchPage() {
 
         if (!cancelled) {
           setResults(nextResults);
+          const debug = getCatalogDebugState();
+          if (debug.status === "fallback" || debug.status === "empty" || debug.status === "failed") {
+            setDebugMessage(
+              `${debug.message ?? "Card search issue."} Backend: ${debug.baseUrl || "unset"}. Status: ${debug.statusCode ?? "n/a"}.`
+            );
+          } else if (nextResults.length > 0) {
+            setDebugMessage(null);
+          }
         }
       } catch {
         if (!cancelled) {
@@ -333,6 +349,12 @@ export default function SearchPage() {
             </button>
           </div>
         </article>
+
+        {debugMessage ? (
+          <article className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-100">
+            Debug: {debugMessage}
+          </article>
+        ) : null}
 
         <article className="rounded-2xl bg-[#0d0f13] p-4">
           <div className="flex items-center justify-between">

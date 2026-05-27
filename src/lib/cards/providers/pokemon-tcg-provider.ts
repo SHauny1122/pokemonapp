@@ -2,10 +2,37 @@ import { CardPagination } from "@/lib/cards/types";
 import { PokemonTCGProvider } from "@/lib/cards/providers/provider-interfaces";
 
 const POKEMON_TCG_API_BASE_URL = "https://api.pokemontcg.io/v2";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "");
 const DEFAULT_SEARCH_PAGE_SIZE = 24;
 const DEFAULT_SET_CARDS_PAGE_SIZE = 50;
 const DEFAULT_SETS_PAGE_SIZE = 80;
 const MAX_PAGE_SIZE = 250;
+
+type CapacitorWindow = Window & {
+  Capacitor?: {
+    isNativePlatform?: () => boolean;
+  };
+};
+
+type PokemonTcgDebugInfo = {
+  baseUrl: string;
+  lastRequestUrl: string | null;
+  lastStatus: number | null;
+  lastError: string | null;
+  isNativeCapacitor: boolean;
+  isUsingBackendProxy: boolean;
+  hasApiBaseUrl: boolean;
+};
+
+const pokemonTcgDebugInfo: PokemonTcgDebugInfo = {
+  baseUrl: "",
+  lastRequestUrl: null,
+  lastStatus: null,
+  lastError: null,
+  isNativeCapacitor: false,
+  isUsingBackendProxy: false,
+  hasApiBaseUrl: Boolean(API_BASE_URL),
+};
 
 type PokemonTcgCardPrice = {
   low?: number;
@@ -105,20 +132,85 @@ function clampPageSize(value: number | undefined, fallback: number) {
   return Math.min(Math.floor(value), 250);
 }
 
-async function fetchPokemonTcgJson<T>(path: string) {
-  const response = await fetch(`${POKEMON_TCG_API_BASE_URL}${path}`, {
-    method: "GET",
-    headers: {
-      Accept: "application/json",
-    },
-    next: { revalidate: 3600 },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Pokemon TCG API request failed with ${response.status}`);
+function isNativeCapacitorRuntime() {
+  if (typeof window === "undefined") {
+    return false;
   }
 
-  return (await response.json()) as T;
+  const capacitor = (window as CapacitorWindow).Capacitor;
+
+  return Boolean(capacitor?.isNativePlatform?.());
+}
+
+function getPokemonTcgRequestBaseUrl() {
+  if (API_BASE_URL) {
+    return `${API_BASE_URL}/api/pokemon-tcg`;
+  }
+
+  return POKEMON_TCG_API_BASE_URL;
+}
+
+function getPokemonTcgRequestUrl(path: string) {
+  if (!API_BASE_URL) {
+    return `${POKEMON_TCG_API_BASE_URL}${path}`;
+  }
+
+  return `${API_BASE_URL}/api/pokemon-tcg`;
+}
+
+export function getPokemonTcgDebugInfo() {
+  return {
+    ...pokemonTcgDebugInfo,
+    baseUrl: getPokemonTcgRequestBaseUrl(),
+    hasApiBaseUrl: Boolean(API_BASE_URL),
+    isNativeCapacitor: isNativeCapacitorRuntime(),
+    isUsingBackendProxy: Boolean(API_BASE_URL),
+  };
+}
+
+async function fetchPokemonTcgJson<T>(path: string) {
+  const requestUrl = getPokemonTcgRequestUrl(path);
+  pokemonTcgDebugInfo.baseUrl = getPokemonTcgRequestBaseUrl();
+  pokemonTcgDebugInfo.lastRequestUrl = requestUrl;
+  pokemonTcgDebugInfo.lastStatus = null;
+  pokemonTcgDebugInfo.lastError = null;
+  pokemonTcgDebugInfo.isNativeCapacitor = isNativeCapacitorRuntime();
+  pokemonTcgDebugInfo.isUsingBackendProxy = Boolean(API_BASE_URL);
+  pokemonTcgDebugInfo.hasApiBaseUrl = Boolean(API_BASE_URL);
+
+  const response = await fetch(
+    requestUrl,
+    API_BASE_URL
+      ? {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ path }),
+        }
+      : {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+          },
+          next: { revalidate: 3600 },
+        }
+  );
+
+  pokemonTcgDebugInfo.lastStatus = response.status;
+
+  if (!response.ok) {
+    pokemonTcgDebugInfo.lastError = `Pokemon TCG API request failed with ${response.status}`;
+    throw new Error(pokemonTcgDebugInfo.lastError);
+  }
+
+  try {
+    return (await response.json()) as T;
+  } catch (error) {
+    pokemonTcgDebugInfo.lastError = error instanceof Error ? error.message : "Invalid Pokemon TCG API JSON response";
+    throw error;
+  }
 }
 
 export async function searchPokemonCards(rawQuery: string, pagination?: CardPagination) {
