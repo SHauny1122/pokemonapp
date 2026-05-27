@@ -8,7 +8,7 @@ const SET_CACHE_CONTROL = "public, s-maxage=86400, stale-while-revalidate=604800
 const CARD_CACHE_CONTROL = "public, s-maxage=3600, stale-while-revalidate=86400";
 const FALLBACK_CACHE_CONTROL = "public, s-maxage=300, stale-while-revalidate=86400";
 
-export const dynamic = "force-dynamic";
+export const dynamic = "force-static";
 
 const allowedRoots = new Set(["cards", "sets"]);
 const allowedOrigins = new Set([
@@ -342,18 +342,11 @@ export function OPTIONS(request: NextRequest) {
 }
 
 export function GET(request: NextRequest) {
-  const rawPath = request.nextUrl.searchParams.get("path");
-
-  if (rawPath) {
-    return proxyPokemonTcgRequest(request, rawPath);
-  }
-
   return Response.json(
     {
       ok: true,
       route: "/api/pokemon-tcg",
       methods: ["GET", "POST", "OPTIONS"],
-      getExample: "/api/pokemon-tcg?path=sets%3Fpage%3D1%26pageSize%3D24",
       postExample: { path: "/sets?page=1&pageSize=24" },
       cache: {
         sets: SET_CACHE_CONTROL,
