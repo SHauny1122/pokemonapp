@@ -8,7 +8,7 @@ const SET_CACHE_CONTROL = "public, s-maxage=86400, stale-while-revalidate=604800
 const CARD_CACHE_CONTROL = "public, s-maxage=3600, stale-while-revalidate=86400";
 const FALLBACK_CACHE_CONTROL = "public, s-maxage=300, stale-while-revalidate=86400";
 
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 
 const allowedRoots = new Set(["cards", "sets"]);
 const allowedOrigins = new Set([
@@ -340,7 +340,7 @@ export function GET(request: NextRequest) {
         fallbackCards: seedCards.length,
       },
     },
-    { headers: { ...getCorsHeaders(request), "Cache-Control": SET_CACHE_CONTROL } }
+    { headers: { ...getCorsHeaders(request), "Cache-Control": "no-store" } }
   );
 }
 
