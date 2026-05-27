@@ -212,6 +212,18 @@ function responseFromCache(entry: ProxyCacheEntry, corsHeaders: Record<string, s
   });
 }
 
+async function cacheProxyResponse(cacheKey: string, root: string, response: Response) {
+  const clone = response.clone();
+
+  proxyCache.set(cacheKey, {
+    body: await clone.text(),
+    contentType: clone.headers.get("Content-Type") ?? "application/json",
+    status: clone.status,
+    cacheControl: clone.headers.get("Cache-Control") ?? getCacheControl(root),
+    expiresAt: Date.now() + getInMemoryTtlMs(root),
+  });
+}
+
 async function proxyPokemonTcgRequest(request: NextRequest, rawPath: string) {
   const corsHeaders = getCorsHeaders(request);
   const { path, rawSearch } = parseRequestPath(rawPath);
@@ -262,6 +274,7 @@ async function proxyPokemonTcgRequest(request: NextRequest, rawPath: string) {
       const fallbackResponse = getFallbackResponse(path, rawSearch, corsHeaders, `Pokemon TCG API returned ${response.status}.`);
 
       if (fallbackResponse) {
+        await cacheProxyResponse(cacheKey, root, fallbackResponse);
         return fallbackResponse;
       }
     }
@@ -298,6 +311,7 @@ async function proxyPokemonTcgRequest(request: NextRequest, rawPath: string) {
     const fallbackResponse = getFallbackResponse(path, rawSearch, corsHeaders, message);
 
     if (fallbackResponse) {
+      await cacheProxyResponse(cacheKey, root, fallbackResponse);
       return fallbackResponse;
     }
 
