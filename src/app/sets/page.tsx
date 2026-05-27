@@ -8,6 +8,7 @@ import { useCurrency } from "@/components/currency-provider";
 import { getSets } from "@/lib/cards/card-service";
 import { getCatalogDebugState } from "@/lib/cards/api-card-service";
 import { CardSet } from "@/lib/cards/types";
+import { seedSets } from "@/lib/cards/seed-catalog";
 
 const INITIAL_PAGE = 1;
 const PAGE_SIZE = 24;
@@ -22,14 +23,33 @@ function formatReleaseDate(dateString?: string) {
   }
 }
 
+function getSeedSetPage(pageNum: number) {
+  const start = (pageNum - 1) * PAGE_SIZE;
+  return seedSets.slice(start, start + PAGE_SIZE);
+}
+
+function formatDebugMessage() {
+  const debug = getCatalogDebugState();
+
+  if (debug.status === "fallback") {
+    return `Using cached/fallback sets. Live refresh issue: ${debug.statusCode ?? "n/a"}.`;
+  }
+
+  if (debug.status === "failed" || debug.status === "empty") {
+    return `${debug.message ?? "Set catalog issue."} Backend: ${debug.baseUrl || "unset"}. Status: ${debug.statusCode ?? "n/a"}.`;
+  }
+
+  return null;
+}
+
 export default function SetsPage() {
   const { formatUsd } = useCurrency();
   const { cards: collectionCards } = useCollection();
-  const [sets, setSets] = useState<CardSet[]>([]);
+  const [sets, setSets] = useState<CardSet[]>(() => getSeedSetPage(INITIAL_PAGE));
   const [page, setPage] = useState(INITIAL_PAGE);
   const [isLoading, setIsLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(false);
   const [debugMessage, setDebugMessage] = useState<string | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
@@ -50,34 +70,40 @@ export default function SetsPage() {
     setIsLoading(true);
     try {
       const fetchedSets = await getSets({ page: pageNum, pageSize: PAGE_SIZE });
-      const debug = getCatalogDebugState();
+      const nextSets = fetchedSets.length > 0 ? fetchedSets : getSeedSetPage(pageNum);
 
       if (isReset) {
-        setSets(fetchedSets);
+        setSets(nextSets);
       } else {
         setSets((current) => {
           const byId = new Map(current.map((set) => [set.id, set]));
-          fetchedSets.forEach((set) => {
+          nextSets.forEach((set) => {
             byId.set(set.id, set);
           });
           return Array.from(byId.values());
         });
       }
 
-      setHasMore(fetchedSets.length === PAGE_SIZE);
-      if (debug.status === "failed" || debug.status === "empty") {
-        setDebugMessage(
-          `${debug.message ?? "Set catalog issue."} Backend: ${debug.baseUrl || "unset"}. Status: ${debug.statusCode ?? "n/a"}.`
-        );
-      } else if (fetchedSets.length > 0) {
+      setHasMore(nextSets.length === PAGE_SIZE);
+      const message = formatDebugMessage();
+      if (message) {
+        setDebugMessage(message);
+      } else if (nextSets.length > 0) {
         setDebugMessage(null);
       }
     } catch {
-      const debug = getCatalogDebugState();
-      setDebugMessage(
-        `${debug.message ?? "Set catalog API failed."} Backend: ${debug.baseUrl || "unset"}. Status: ${debug.statusCode ?? "n/a"}.`
-      );
-      setHasMore(false);
+      const fallbackPage = getSeedSetPage(pageNum);
+      if (fallbackPage.length > 0) {
+        setSets((current) => {
+          const byId = new Map(current.map((set) => [set.id, set]));
+          fallbackPage.forEach((set) => {
+            byId.set(set.id, set);
+          });
+          return Array.from(byId.values());
+        });
+      }
+      setDebugMessage(formatDebugMessage() ?? "Using cached/fallback sets while live catalog refreshes.");
+      setHasMore(fallbackPage.length === PAGE_SIZE);
     } finally {
       setIsLoading(false);
       setIsInitialLoad(false);
@@ -133,7 +159,7 @@ export default function SetsPage() {
         </article>
 
         {debugMessage ? (
-          <article className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-100">
+          <article className="rounded-xl border border-amber-400/20 bg-[#11100b] p-2.5 text-[11px] text-amber-100/75">
             Debug: {debugMessage}
           </article>
         ) : null}

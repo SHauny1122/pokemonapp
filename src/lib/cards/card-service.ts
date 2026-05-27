@@ -1,7 +1,6 @@
 import { apiCardService } from "@/lib/cards/api-card-service";
-import { mockCardService } from "@/lib/cards/mock-card-service";
-import { mockCards, mockSets } from "@/lib/mock-data";
 import { Card, CardService, CardSet } from "@/lib/cards/types";
+import { getSeedCardsBySet, seedCards, seedSets } from "@/lib/cards/seed-catalog";
 
 // Public app-facing service layer.
 //
@@ -27,41 +26,35 @@ export const getDealCheck = cardService.getDealCheck;
 
 // Mock-sync helpers keep existing mock-first screens and local collection
 // behavior stable while we progressively move more flows to async API data.
-const toMockCard = (card: (typeof mockCards)[number]): Card => ({ ...card });
-const toMockSet = (set: (typeof mockSets)[number]): CardSet => ({ ...set });
+const toMockCard = (card: Card): Card => ({ ...card });
+const toMockSet = (set: CardSet): CardSet => ({ ...set });
 
 export const searchCardsMockSync = (query: string): Card[] => {
   const q = query.trim().toLowerCase();
 
   if (!q) {
-    return mockCards.map(toMockCard);
+    return seedCards.map(toMockCard);
   }
 
-  return mockCards
+  return seedCards
     .filter((card) => [card.name, card.set, card.number, card.rarity, card.type].join(" ").toLowerCase().includes(q))
     .map(toMockCard);
 };
 
 export const getCardByIdMockSync = (id: string): Card | undefined => {
-  const card = mockCards.find((entry) => entry.id === id);
+  const card = seedCards.find((entry) => entry.id === id);
   return card ? toMockCard(card) : undefined;
 };
 
 export const getSetsMockSync = (): CardSet[] => {
-  return mockSets.map(toMockSet);
+  return seedSets.map(toMockSet);
 };
 
 export const getSetByIdMockSync = (setId: string): CardSet | undefined => {
-  const set = mockSets.find((entry) => entry.id === setId);
+  const set = seedSets.find((entry) => entry.id === setId);
   return set ? toMockSet(set) : undefined;
 };
 
 export const getCardsBySetMockSync = (setId: string): Card[] => {
-  const set = mockSets.find((entry) => entry.id === setId);
-
-  if (!set) {
-    return [];
-  }
-
-  return mockCards.filter((card) => card.set === set.name).map(toMockCard);
+  return getSeedCardsBySet(setId).map(toMockCard);
 };

@@ -7,6 +7,7 @@ import { useCurrency } from "@/components/currency-provider";
 import { Card, CardSet } from "@/lib/cards/types";
 import { getSets, searchCards } from "@/lib/cards/card-service";
 import { getCatalogDebugState } from "@/lib/cards/api-card-service";
+import { seedCards, seedSets } from "@/lib/cards/seed-catalog";
 
 const SEARCH_DEBOUNCE_MS = 400;
 const DISCOVER_SET_PREVIEW_PAGE_SIZE = 80;
@@ -175,13 +176,27 @@ function TrendingCard({ card }: { card: Card }) {
   );
 }
 
+function formatDebugMessage(fallbackLabel: string) {
+  const debug = getCatalogDebugState();
+
+  if (debug.status === "fallback") {
+    return `${fallbackLabel} Live refresh issue: ${debug.statusCode ?? "n/a"}.`;
+  }
+
+  if (debug.status === "failed" || debug.status === "empty") {
+    return `${debug.message ?? "Catalog issue."} Backend: ${debug.baseUrl || "unset"}. Status: ${debug.statusCode ?? "n/a"}.`;
+  }
+
+  return null;
+}
+
 export default function SearchPage() {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
-  const [results, setResults] = useState<Card[]>([]);
-  const [sets, setSets] = useState<CardSet[]>([]);
-  const [isLoadingResults, setIsLoadingResults] = useState(true);
-  const [isLoadingSets, setIsLoadingSets] = useState(true);
+  const [results, setResults] = useState<Card[]>(() => seedCards);
+  const [sets, setSets] = useState<CardSet[]>(() => seedSets.slice(0, DISCOVER_SET_PREVIEW_PAGE_SIZE));
+  const [isLoadingResults, setIsLoadingResults] = useState(false);
+  const [isLoadingSets, setIsLoadingSets] = useState(false);
   const [resultsError, setResultsError] = useState<string | null>(null);
   const [setsError, setSetsError] = useState<string | null>(null);
   const [debugMessage, setDebugMessage] = useState<string | null>(null);
@@ -196,23 +211,20 @@ export default function SearchPage() {
 
     const loadSets = async () => {
       try {
-        setIsLoadingSets(true);
+        setIsLoadingSets(false);
         setSetsError(null);
         const nextSets = await getSets({ page: 1, pageSize: DISCOVER_SET_PREVIEW_PAGE_SIZE });
 
         if (!cancelled) {
-          setSets(nextSets);
-          const debug = getCatalogDebugState();
-          if (debug.status === "failed" || debug.status === "empty") {
-            setDebugMessage(
-              `${debug.message ?? "Set catalog issue."} Backend: ${debug.baseUrl || "unset"}. Status: ${debug.statusCode ?? "n/a"}.`
-            );
+          if (nextSets.length > 0) {
+            setSets(nextSets);
           }
+          setDebugMessage(formatDebugMessage("Using cached/fallback sets."));
         }
       } catch {
         if (!cancelled) {
-          setSetsError("Unable to load sets right now.");
-          setSets([]);
+          setSetsError("Using cached set catalog while live sets refresh.");
+          setDebugMessage(formatDebugMessage("Using cached/fallback sets."));
         }
       } finally {
         if (!cancelled) {
@@ -243,25 +255,35 @@ export default function SearchPage() {
 
     const loadResults = async () => {
       try {
-        setIsLoadingResults(true);
+        setIsLoadingResults(false);
         setResultsError(null);
+        const seedMatches = debouncedQuery.trim()
+          ? seedCards.filter((card) =>
+              [card.name, card.set, card.number, card.rarity, card.type].join(" ").toLowerCase().includes(debouncedQuery.trim().toLowerCase())
+            )
+          : seedCards;
+
+        if (seedMatches.length > 0) {
+          setResults(seedMatches);
+        }
+
         const nextResults = await searchCards(debouncedQuery);
 
         if (!cancelled) {
-          setResults(nextResults);
-          const debug = getCatalogDebugState();
-          if (debug.status === "fallback" || debug.status === "empty" || debug.status === "failed") {
-            setDebugMessage(
-              `${debug.message ?? "Card search issue."} Backend: ${debug.baseUrl || "unset"}. Status: ${debug.statusCode ?? "n/a"}.`
-            );
+          if (nextResults.length > 0) {
+            setResults(nextResults);
+          }
+          const message = formatDebugMessage("Using cached/fallback cards.");
+          if (message) {
+            setDebugMessage(message);
           } else if (nextResults.length > 0) {
             setDebugMessage(null);
           }
         }
       } catch {
         if (!cancelled) {
-          setResultsError("Search is unavailable right now.");
-          setResults([]);
+          setResultsError("Using cached card catalog while live search refreshes.");
+          setDebugMessage(formatDebugMessage("Using cached/fallback cards."));
         }
       } finally {
         if (!cancelled) {
@@ -352,7 +374,7 @@ export default function SearchPage() {
         </article>
 
         {debugMessage ? (
-          <article className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-100">
+          <article className="rounded-xl border border-amber-400/20 bg-[#11100b] p-2.5 text-[11px] text-amber-100/75">
             Debug: {debugMessage}
           </article>
         ) : null}

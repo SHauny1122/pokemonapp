@@ -1,66 +1,46 @@
-import { mockCards, mockSets } from "@/lib/mock-data";
-import {
-  Card,
-  CardService,
-  CardSet,
-  PriceSummary,
-} from "@/lib/cards/types";
+import { getSeedCardsBySet, seedCards, seedSets } from "@/lib/cards/seed-catalog";
+import { CardService, PriceSummary } from "@/lib/cards/types";
 
-function toCard(card: (typeof mockCards)[number]): Card {
-  return {
-    ...card,
-    dataSource: "mock",
-  };
-}
+function paginate<T>(items: T[], page?: number, pageSize?: number) {
+  if (!page && !pageSize) {
+    return items;
+  }
 
-function toSet(set: (typeof mockSets)[number]): CardSet {
-  return { ...set };
+  const safePage = Math.max(1, page ?? 1);
+  const safePageSize = Math.max(1, pageSize ?? items.length);
+  const start = (safePage - 1) * safePageSize;
+
+  return items.slice(start, start + safePageSize);
 }
 
 export const mockCardService: CardService = {
-  async searchCards(query) {
+  async searchCards(query, pagination) {
     const q = query.trim().toLowerCase();
+    const matches = q
+      ? seedCards.filter((card) => [card.name, card.set, card.number, card.rarity, card.type].join(" ").toLowerCase().includes(q))
+      : seedCards;
 
-    if (!q) {
-      return mockCards.map(toCard);
-    }
-
-    return mockCards
-      .filter((card) => {
-        const searchable = [card.name, card.set, card.number, card.rarity, card.type]
-          .join(" ")
-          .toLowerCase();
-        return searchable.includes(q);
-      })
-      .map(toCard);
+    return paginate(matches, pagination?.page, pagination?.pageSize);
   },
 
   async getCardById(id) {
-    const card = mockCards.find((entry) => entry.id === id);
-    return card ? toCard(card) : undefined;
+    return seedCards.find((entry) => entry.id === id);
   },
 
-  async getSets() {
-    return mockSets.map(toSet);
+  async getSets(pagination) {
+    return paginate(seedSets, pagination?.page, pagination?.pageSize);
   },
 
   async getSetById(setId) {
-    const set = mockSets.find((entry) => entry.id === setId);
-    return set ? toSet(set) : undefined;
+    return seedSets.find((entry) => entry.id === setId);
   },
 
-  async getCardsBySet(setId) {
-    const set = mockSets.find((entry) => entry.id === setId);
-
-    if (!set) {
-      return [];
-    }
-
-    return mockCards.filter((card) => card.set === set.name).map(toCard);
+  async getCardsBySet(setId, pagination) {
+    return paginate(getSeedCardsBySet(setId), pagination?.page, pagination?.pageSize);
   },
 
   getPriceSummary(cardId) {
-    const card = mockCards.find((entry) => entry.id === cardId);
+    const card = seedCards.find((entry) => entry.id === cardId);
 
     if (!card) {
       return undefined;
@@ -69,6 +49,7 @@ export const mockCardService: CardService = {
     const summary: PriceSummary = {
       cardId: card.id,
       marketPrice: card.marketValue,
+      pricing: card.pricing,
       flipScore: card.flipScore,
       trend: card.trend,
       history: card.history,
@@ -77,7 +58,7 @@ export const mockCardService: CardService = {
     return summary;
   },
 
-  getDealCheck(cardId, askingPrice) {
+  getDealCheck() {
     return undefined;
   },
 };

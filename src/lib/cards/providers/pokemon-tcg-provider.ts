@@ -155,7 +155,7 @@ function getPokemonTcgRequestUrl(path: string) {
     return `${POKEMON_TCG_API_BASE_URL}${path}`;
   }
 
-  return `${API_BASE_URL}/api/pokemon-tcg`;
+  return `${API_BASE_URL}/api/pokemon-tcg?path=${encodeURIComponent(path.replace(/^\/+/, ""))}`;
 }
 
 export function getPokemonTcgDebugInfo() {
@@ -182,12 +182,10 @@ async function fetchPokemonTcgJson<T>(path: string) {
     requestUrl,
     API_BASE_URL
       ? {
-          method: "POST",
+          method: "GET",
           headers: {
             Accept: "application/json",
-            "Content-Type": "application/json",
           },
-          body: JSON.stringify({ path }),
         }
       : {
           method: "GET",
