@@ -264,6 +264,14 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await response.text();
+    if (!response.ok) {
+      const fallbackResponse = getFallbackResponse(path, rawSearch, corsHeaders, `Pokemon TCG API returned ${response.status}.`);
+
+      if (fallbackResponse) {
+        return fallbackResponse;
+      }
+    }
+
     return new Response(body, {
       headers: {
         ...corsHeaders,
